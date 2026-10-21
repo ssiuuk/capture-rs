@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>capture-rs</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="toolbox.css" />
+</head>
+<body>
+  <main class="toolbox">
+    <nav class="tabs" aria-label="Capture type">
+      <button class="tab active" aria-pressed="true"><span class="tab-icon">&#128247;</span>Image</button>
+      <button class="tab" disabled title="Video recording is planned"><span class="tab-icon">&#127909;</span>Video</button>
+    </nav>
+
+    <section class="options">
+      <label class="row">
+        <span>Selection:</span>
+        <select id="capture_mode">
+          <option value="ask">Ask each time</option>
+          <option value="region">Region</option>
+          <option value="window">Window</option>
+          <option value="full_screen">Full screen</option>
+        </select>
+      </label>
+      <label class="row">
+        <span>Effects:</span>
+        <select disabled title="Effects are planned"><option>None</option></select>
+      </label>
+      <label class="row">
+        <span>Share:</span>
+        <select disabled title="Sharing is planned"><option>None</option></select>
+      </label>
+    </section>
+
+    <section class="toggles">
+      <label class="row" title="The editor is planned">
+        <span>Preview in Editor</span>
+        <span class="switch"><input type="checkbox" id="preview_in_editor" disabled /><span></span></span>
+      </label>
+      <label class="row">
+        <span>Save to File</span>
+        <span class="switch"><input type="checkbox" id="save_to_file" /><span></span></span>
+      </label>
+      <label class="row">
+        <span>Copy to Clipboard</span>
+        <span class="switch"><input type="checkbox" id="copy_to_clipboard" /><span></span></span>
+      </label>
+      <label class="row" title="Drawing the cursor into captures is planned">
+        <span>Capture Cursor</span>
+        <span class="switch"><input type="checkbox" id="capture_cursor" disabled /><span></span></span>
+      </label>
+      <label class="row">
+        <span>Time Delay</span>
+        <select id="delay_secs" class="delay">
+          <option value="0">Off</option>
+          <option value="1">1 s</option>
+          <option value="2">2 s</option>
+          <option value="3">3 s</option>
+          <option value="5">5 s</option>
+          <option value="10">10 s</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="capture">
+      <button id="capture" class="capture-button">Capture</button>
+      <div id="capture_hotkey" class="hotkey-label"></div>
+    </section>
+
+    <footer class="bar">
+      <button class="link" disabled title="Presets are planned">&#9881; Presets</button>
+      <button id="hotkeys" class="link">&#9000; Hotkeys</button>
+      <span id="status" class="status" role="status"></span>
+      <button id="open_folder" class="link">Open folder</button>
+      <button class="link" disabled title="The editor is planned">&#9998; Open Editor</button>
+    </footer>
+  </main>
+  <script src="toolbox.js"></script>
+</body>
+</html>

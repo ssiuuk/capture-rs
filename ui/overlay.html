@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>capture-rs overlay</title>
+  <link rel="stylesheet" href="overlay.css" />
+</head>
+<body>
+  <canvas id="screen"></canvas>
+
+  <div id="chooser" class="chooser" hidden>
+    <button data-mode="region"><b>Region</b><kbd>R</kbd></button>
+    <button data-mode="window"><b>Window</b><kbd>W</kbd></button>
+    <button data-mode="full_screen"><b>Full screen</b><kbd>F</kbd></button>
+    <button data-mode="all_screens" id="all_screens" hidden><b>All screens</b><kbd>A</kbd></button>
+    <button data-mode="cancel" class="quiet"><b>Cancel</b><kbd>Esc</kbd></button>
+  </div>
+
+  <div id="size" class="size" hidden></div>
+
+  <div id="actions" class="actions" hidden>
+    <button id="confirm" class="primary">Capture <kbd>Enter</kbd></button>
+    <button id="redo">Redo</button>
+    <button id="cancel">Cancel <kbd>Esc</kbd></button>
+  </div>
+
+  <div id="loupe" class="loupe" hidden>
+    <canvas id="loupe_canvas"></canvas>
+    <div class="loupe-info">
+      <span id="loupe_pos"></span>
+      <span><i id="loupe_swatch"></i><span id="loupe_color"></span></span>
+    </div>
+  </div>
+
+  <div id="hint" class="hint" hidden></div>
+  <script src="overlay.js"></script>
+</body>
+</html>

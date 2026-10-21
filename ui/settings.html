@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>capture-rs hotkeys</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <main class="settings">
+    <h1>Hotkeys</h1>
+    <p class="lead">Click a shortcut and press the keys you want. Esc cancels.</p>
+    <div id="warning" class="warning" hidden>
+      Windows is set to open Snipping Tool when you press Print Screen, so capture-rs may not receive it.
+      <button id="open_keyboard_settings" class="link">Open Windows keyboard settings</button>
+    </div>
+    <table>
+      <tbody id="rows"></tbody>
+    </table>
+    <footer>
+      <button id="reset">Reset to defaults</button>
+      <button id="close" class="primary">Done</button>
+    </footer>
+  </main>
+  <script src="settings.js"></script>
+</body>
+</html>

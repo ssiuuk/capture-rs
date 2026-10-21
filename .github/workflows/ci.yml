@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  core:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy -p capture-core --all-targets -- -D warnings
+      - run: cargo test -p capture-core
+
+  windows:
+    name: Windows build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release -p capture-rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capture-rs-exe
+          path: target/release/capture-rs.exe
+      - name: Build installer
+        working-directory: app
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capture-rs-installer
+          path: target/release/bundle/nsis/*.exe

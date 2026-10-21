@@ -1,0 +1,39 @@
+[hidden] { display: none !important; }
+:root { --accent: #ff6a2b; font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none; }
+body.region { cursor: crosshair; }
+body.window { cursor: pointer; }
+#screen { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+kbd {
+  font: 11px "Segoe UI", sans-serif; padding: 1px 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); margin-left: 6px;
+}
+.chooser {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; gap: 8px; padding: 10px; border-radius: 10px;
+  background: rgba(24, 28, 34, 0.92); box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.chooser button, .actions button {
+  border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: white;
+  padding: 10px 16px; border-radius: 6px; cursor: pointer; font: inherit; display: flex; align-items: center;
+}
+.chooser button:hover, .actions button:hover { background: rgba(255,255,255,0.16); }
+.chooser .quiet { color: #c5ccd6; }
+.actions { position: fixed; display: flex; gap: 6px; padding: 6px; border-radius: 8px; background: rgba(24, 28, 34, 0.92); }
+.actions button { padding: 6px 12px; }
+.actions .primary { background: var(--accent); border-color: var(--accent); }
+.size {
+  position: fixed; padding: 3px 8px; border-radius: 4px; background: rgba(24, 28, 34, 0.9);
+  color: white; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.loupe {
+  position: fixed; width: 136px; pointer-events: none; border-radius: 8px; overflow: hidden;
+  background: rgba(24, 28, 34, 0.94); box-shadow: 0 4px 16px rgba(0,0,0,0.5); color: white;
+}
+#loupe_canvas { display: block; width: 136px; height: 136px; image-rendering: pixelated; }
+.loupe-info { display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+#loupe_swatch { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 1px solid #fff; vertical-align: -1px; }
+.hint {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 6px 12px; border-radius: 6px;
+  background: rgba(24, 28, 34, 0.85); color: #e5e9ef; pointer-events: none;
+}
