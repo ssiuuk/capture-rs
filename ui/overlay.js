@@ -222,8 +222,11 @@ async function cancel() {
 
 // ---- input ----------------------------------------------------------------
 
+// Input only counts once the overlay is set up and until it starts closing.
+const live = () => info && !finished;
+
 window.addEventListener('mousemove', (e) => {
-  if (!info || finished) return;
+  if (!live()) return;
   cursor = toLocal(e);
   if (dragStart) selection = rectFromCorners(dragStart, cursor);
   hoverWindow = dragStart || pending ? null : windowAt(cursor);
@@ -233,14 +236,14 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseenter', () => {
   // Keyboard shortcuts go to the monitor the mouse is on.
-  if (info && !document.hasFocus()) getCurrentWindow().setFocus().catch(() => {});
+  if (live() && !document.hasFocus()) getCurrentWindow().setFocus().catch(() => {});
 });
 
 const insideSelection = (p) => selection && p.x >= selection.x && p.x < selection.x + selection.width
   && p.y >= selection.y && p.y < selection.y + selection.height;
 
 canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0 || !info) return;
+  if (e.button !== 0 || !live()) return;
   if (mode === 'region') {
     const at = toLocal(e);
     // A click inside a pending selection keeps it, so a double-click can
@@ -255,7 +258,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
-  if (e.button !== 0 || !info) return;
+  if (e.button !== 0 || !live()) return;
   if (mode === 'window') {
     const w = windowAt(toLocal(e));
     return finish(w ? w.bounds : info.monitor.bounds);
@@ -280,16 +283,17 @@ window.addEventListener('mouseup', (e) => {
   drawLoupe(e);
 });
 
-canvas.addEventListener('dblclick', () => { if (pending) finish(toGlobal(selection)); });
+canvas.addEventListener('dblclick', () => { if (live() && pending) finish(toGlobal(selection)); });
 
 window.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  if (!live()) return;
   if (pending || dragStart) resetSelection();
   else cancel();
 });
 
 window.addEventListener('keydown', (e) => {
-  if (!info) return;
+  if (!live()) return;
   if (e.key === 'Escape') {
     e.preventDefault();
     return pending || dragStart ? resetSelection() : cancel();
@@ -319,15 +323,15 @@ window.addEventListener('keydown', (e) => {
 
 $('chooser').addEventListener('click', (e) => {
   const button = e.target.closest('button');
-  if (button) setMode(button.dataset.mode, true);
+  if (button && live()) setMode(button.dataset.mode, true);
 });
-$('confirm').addEventListener('click', () => finish(toGlobal(selection)));
-$('redo').addEventListener('click', resetSelection);
+$('confirm').addEventListener('click', () => { if (live() && selection) finish(toGlobal(selection)); });
+$('redo').addEventListener('click', () => { if (live()) resetSelection(); });
 $('cancel').addEventListener('click', cancel);
 
 // Keep all monitors' overlays in the same mode, with one selection at a time.
 listen('overlay-mode', ({ payload }) => {
-  if (info && payload.session === info.session && payload.mode !== mode) setMode(payload.mode);
+  if (live() && payload.session === info.session && payload.mode !== mode) setMode(payload.mode);
 });
 listen('overlay-closing', ({ payload }) => {
   if (info && payload.session === info.session && !finished) {
@@ -336,7 +340,7 @@ listen('overlay-closing', ({ payload }) => {
   }
 });
 listen('overlay-selection-start', ({ payload }) => {
-  if (info && payload.session === info.session && payload.monitor !== monitorIndex) resetSelection();
+  if (live() && payload.session === info.session && payload.monitor !== monitorIndex) resetSelection();
 });
 
 // ---- startup --------------------------------------------------------------
@@ -403,6 +407,8 @@ const fadeIn = () => fadeTo(DIM);
 function fadeOut() {
   for (const id of ['chooser', 'actions', 'loupe', 'size', 'hint']) $(id).hidden = true;
   selection = null;
+  dragStart = null;
+  pending = false;
   hoverWindow = null;
   cursor = null;
   return fadeTo(0);

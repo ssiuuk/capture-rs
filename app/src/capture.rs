@@ -160,7 +160,9 @@ fn count_down(app: &AppHandle, secs: u8) {
         let _ = app.emit_to(COUNTDOWN, "countdown-tick", left);
         std::thread::sleep(Duration::from_secs(1));
     }
-    if let Some(w) = window {
+    // Look the window up by label rather than trusting `window`: it may
+    // exist even if setting it up failed part way.
+    if let Some(w) = window.or_else(|| app.get_webview_window(COUNTDOWN)) {
         let _ = w.destroy();
         // Give the compositor a moment so the countdown is not captured.
         std::thread::sleep(Duration::from_millis(150));
@@ -181,6 +183,15 @@ fn open_countdown(app: &AppHandle, secs: u8) -> tauri::Result<WebviewWindow> {
         .focused(false)
         .visible(false)
         .build()?;
+    if let Err(e) = place_countdown(app, &window) {
+        // Destroy it now so the fixed label is free for the next countdown.
+        let _ = window.destroy();
+        return Err(e);
+    }
+    Ok(window)
+}
+
+fn place_countdown(app: &AppHandle, window: &WebviewWindow) -> tauri::Result<()> {
     let monitor = app
         .cursor_position()
         .ok()
@@ -195,8 +206,7 @@ fn open_countdown(app: &AppHandle, secs: u8) -> tauri::Result<WebviewWindow> {
     }
     // Clicks pass through to whatever is being set up for the capture.
     window.set_ignore_cursor_events(true)?;
-    window.show()?;
-    Ok(window)
+    window.show()
 }
 
 /// Crops, saves and copies the capture, then releases the capture. On error
