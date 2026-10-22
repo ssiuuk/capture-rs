@@ -31,29 +31,33 @@ pub enum CaptureRequest {
 static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
 
 /// Starts a capture on a background thread. Ignored if one is running.
+///
+/// Ownership of the `capturing` flag passes to the capture: it is released
+/// exactly once, by [`release`], after the result is delivered, the user
+/// cancels, or something fails.
 pub fn start(app: &AppHandle, request: CaptureRequest) {
     let state = app.state::<AppState>();
     if state.capturing.swap(true, Ordering::SeqCst) {
         return;
     }
+    let toolbox_was_visible = app
+        .get_webview_window(TOOLBOX)
+        .is_some_and(|w| w.is_visible().unwrap_or(false));
     let app = app.clone();
     std::thread::spawn(move || {
-        if let Err(message) = run(&app, request) {
-            finish_session(&app);
+        if let Err(message) = run(&app, request, toolbox_was_visible) {
+            close_session(&app);
+            release(&app, toolbox_was_visible);
             notify_toolbox(&app, CaptureOutcome::failed(message));
         }
     });
 }
 
-fn run(app: &AppHandle, request: CaptureRequest) -> Result<(), String> {
+fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let settings = state.settings();
 
-    let toolbox = app.get_webview_window(TOOLBOX);
-    let toolbox_was_visible = toolbox
-        .as_ref()
-        .is_some_and(|w| w.is_visible().unwrap_or(false));
-    if let Some(w) = &toolbox {
+    if let Some(w) = app.get_webview_window(TOOLBOX) {
         let _ = w.hide();
     }
     // Let the toolbox finish disappearing, then honour the delay setting.
@@ -65,13 +69,15 @@ fn run(app: &AppHandle, request: CaptureRequest) -> Result<(), String> {
     let cursor = app.cursor_position().ok().map(|p| (p.x as i32, p.y as i32));
 
     let mode = match request {
-        CaptureRequest::RepeatLast => match *lock(&state.last_area) {
-            Some(area) => {
-                return deliver(app, &snapshot, area, toolbox_was_visible);
+        CaptureRequest::RepeatLast => {
+            // Copy the area out first: `deliver` locks `last_area` again.
+            let last = *lock(&state.last_area);
+            match last {
+                Some(area) => return deliver(app, &snapshot, area, toolbox_was_visible),
+                // Nothing to repeat yet: fall back to choosing a region.
+                None => CaptureMode::Region,
             }
-            // Nothing to repeat yet: fall back to choosing a region.
-            None => CaptureMode::Region,
-        },
+        }
         CaptureRequest::Mode(mode) => mode,
     };
 
@@ -84,20 +90,25 @@ fn run(app: &AppHandle, request: CaptureRequest) -> Result<(), String> {
         return deliver(app, &snapshot, area, toolbox_was_visible);
     }
 
+    // Publish the session before any overlay loads, since each overlay asks
+    // for it as soon as its page starts. Labels are recorded before the
+    // window is built so a failure part-way still closes every overlay.
     let id = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
-    let mut labels = Vec::new();
-    for (index, monitor) in snapshot.monitors.iter().enumerate() {
-        let label = format!("overlay-{id}-{index}");
-        open_overlay(app, &label, index, monitor)?;
-        labels.push(label);
-    }
+    let monitors = snapshot.monitors.clone();
     *lock(&state.session) = Some(Session {
         id,
         snapshot,
         mode,
-        overlay_labels: labels,
+        overlay_labels: Vec::new(),
         toolbox_was_visible,
     });
+    for (index, monitor) in monitors.iter().enumerate() {
+        let label = format!("overlay-{id}-{index}");
+        if let Some(s) = lock(&state.session).as_mut() {
+            s.overlay_labels.push(label.clone());
+        }
+        open_overlay(app, &label, index, monitor)?;
+    }
     Ok(())
 }
 
@@ -115,6 +126,9 @@ fn open_overlay(
         .skip_taskbar(true)
         .always_on_top(true)
         .shadow(false)
+        // Transparent so nothing (not even a dark background) shows before
+        // the frozen screen is painted.
+        .transparent(true)
         .visible(false)
         .focused(false)
         .build()
@@ -130,7 +144,8 @@ fn open_overlay(
     Ok(())
 }
 
-/// Crops, saves and copies the capture, then cleans up.
+/// Crops, saves and copies the capture, then releases the capture. On error
+/// nothing is released; the caller does that.
 fn deliver(
     app: &AppHandle,
     snapshot: &DesktopSnapshot,
@@ -143,16 +158,13 @@ fn deliver(
     let state = app.state::<AppState>();
     *lock(&state.last_area) = Some(area);
     let outcome = output::deliver(app, &state.settings(), &image);
-    state.capturing.store(false, Ordering::SeqCst);
-    if show_toolbox {
-        crate::commands::show_toolbox(app);
-    }
+    release(app, show_toolbox);
     notify_toolbox(app, outcome);
     Ok(())
 }
 
-/// Closes every overlay and clears the session. Returns the session.
-fn finish_session(app: &AppHandle) -> Option<Session> {
+/// Clears the session and closes its overlays. Does not end the capture.
+fn close_session(app: &AppHandle) -> Option<Session> {
     let state = app.state::<AppState>();
     let session = lock(&state.session).take();
     if let Some(s) = &session {
@@ -162,8 +174,18 @@ fn finish_session(app: &AppHandle) -> Option<Session> {
             }
         }
     }
-    state.capturing.store(false, Ordering::SeqCst);
     session
+}
+
+/// Ends the capture: lets a new one start and brings the toolbox back if it
+/// was showing when the capture began.
+fn release(app: &AppHandle, show_toolbox: bool) {
+    app.state::<AppState>()
+        .capturing
+        .store(false, Ordering::SeqCst);
+    if show_toolbox {
+        crate::commands::show_toolbox(app);
+    }
 }
 
 #[derive(Serialize)]
@@ -224,18 +246,23 @@ pub fn overlay_ready(app: AppHandle, window: WebviewWindow) -> Result<(), String
 /// The user picked an area (virtual-desktop pixels).
 #[tauri::command]
 pub async fn overlay_finish(app: AppHandle, area: Rect) -> Result<(), String> {
-    let session = finish_session(&app).ok_or("No capture in progress")?;
-    deliver(&app, &session.snapshot, area, session.toolbox_was_visible)
+    let session = close_session(&app).ok_or("No capture in progress")?;
+    let result = deliver(&app, &session.snapshot, area, session.toolbox_was_visible);
+    if let Err(message) = &result {
+        release(&app, session.toolbox_was_visible);
+        notify_toolbox(&app, CaptureOutcome::failed(message.clone()));
+    }
+    result
 }
 
 #[tauri::command]
 pub fn overlay_cancel(app: AppHandle) {
-    if let Some(session) = finish_session(&app) {
-        if session.toolbox_was_visible {
-            crate::commands::show_toolbox(&app);
-        }
+    // Only the call that takes the session ends the capture, so a stray
+    // cancel from a closing overlay cannot release a newer capture.
+    if let Some(session) = close_session(&app) {
+        release(&app, session.toolbox_was_visible);
+        let _ = app.emit_to(TOOLBOX, "capture-cancelled", ());
     }
-    let _ = app.emit_to(TOOLBOX, "capture-cancelled", ());
 }
 
 /// Serves `snapshot://localhost/s<session>-m<monitor>.png`: the frozen image

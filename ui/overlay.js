@@ -13,6 +13,8 @@ const ZOOM = 8;
 const LOUPE_CSS = 136;
 const LOUPE_SRC = LOUPE_CSS / ZOOM; // 17 source pixels across
 const MIN_DRAG = 4; // smaller drags count as a click
+const DIM = 0.45;
+const FADE_MS = 200;
 
 const canvas = $('screen');
 const ctx = canvas.getContext('2d');
@@ -30,6 +32,7 @@ let pending = false; // region drawn, waiting for confirm
 let hoverWindow = null;
 let finished = false;
 let drawQueued = false;
+let dim = 0; // current dimming, eased from 0 to DIM when the overlay opens
 
 // ---- geometry -------------------------------------------------------------
 
@@ -71,7 +74,7 @@ function highlightRect() {
 function draw() {
   const { width, height } = canvas;
   ctx.drawImage(image, 0, 0);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillStyle = `rgba(0, 0, 0, ${dim})`;
   ctx.fillRect(0, 0, width, height);
 
   const px = Math.max(1, Math.round(scale()));
@@ -225,10 +228,17 @@ window.addEventListener('mouseenter', () => {
   if (info && !document.hasFocus()) getCurrentWindow().setFocus().catch(() => {});
 });
 
+const insideSelection = (p) => selection && p.x >= selection.x && p.x < selection.x + selection.width
+  && p.y >= selection.y && p.y < selection.y + selection.height;
+
 canvas.addEventListener('mousedown', (e) => {
   if (e.button !== 0 || !info) return;
   if (mode === 'region') {
-    dragStart = toLocal(e);
+    const at = toLocal(e);
+    // A click inside a pending selection keeps it, so a double-click can
+    // confirm it; clicking elsewhere starts a new selection.
+    if (pending && insideSelection(at)) return;
+    dragStart = at;
     selection = null;
     pending = false;
     $('actions').hidden = true;
@@ -346,7 +356,22 @@ async function start() {
   $('all_screens').hidden = info.monitor_count < 2;
   setMode(info.mode === 'ask' ? 'choose' : info.mode);
   draw();
+  // Wait until the undimmed copy has been painted before showing the
+  // window, then ease the dimming in.
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   await invoke('overlay_ready');
+  fadeIn();
+}
+
+function fadeIn() {
+  const t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / FADE_MS);
+    dim = DIM * (1 - (1 - t) * (1 - t)); // ease-out
+    draw();
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 window.addEventListener('resize', () => { if (info && image) requestDraw(); });
