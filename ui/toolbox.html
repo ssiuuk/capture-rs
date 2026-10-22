@@ -8,52 +8,44 @@
 </head>
 <body>
   <main class="toolbox">
-    <nav class="tabs" aria-label="Capture type">
-      <button class="tab active" aria-pressed="true"><span class="tab-icon">&#128247;</span>Image</button>
-      <button class="tab" disabled title="Video recording is planned"><span class="tab-icon">&#127909;</span>Video</button>
-    </nav>
+    <header class="head">
+      <span class="brand">capture-rs</span>
+      <span class="kind">Image <span class="soon" title="Video recording is planned">Video soon</span></span>
+      <span class="spacer"></span>
+      <button id="hotkeys" class="link">Hotkeys</button>
+      <button id="open_folder" class="link">Open folder</button>
+    </header>
 
-    <section class="options">
-      <label class="row">
-        <span>Selection:</span>
-        <select id="capture_mode">
-          <option value="ask">Ask each time</option>
-          <option value="region">Region</option>
-          <option value="window">Window</option>
-          <option value="full_screen">Full screen</option>
-        </select>
-      </label>
-      <label class="row">
-        <span>Effects:</span>
-        <select disabled title="Effects are planned"><option>None</option></select>
-      </label>
-      <label class="row">
-        <span>Share:</span>
-        <select disabled title="Sharing is planned"><option>None</option></select>
-      </label>
+    <section class="modes" role="radiogroup" aria-label="Capture mode">
+      <button class="mode" data-mode="ask" role="radio">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01"/></svg>
+        Ask
+      </button>
+      <button class="mode" data-mode="region" role="radio">
+        <svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+        Region
+      </button>
+      <button class="mode" data-mode="window" role="radio">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg>
+        Window
+      </button>
+      <button class="mode" data-mode="full_screen" role="radio">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Screen
+      </button>
     </section>
 
-    <section class="toggles">
-      <label class="row" title="The editor is planned">
-        <span>Preview in Editor</span>
-        <span class="switch"><input type="checkbox" id="preview_in_editor" disabled /><span></span></span>
-      </label>
-      <label class="row">
-        <span>Save to File</span>
-        <span class="switch"><input type="checkbox" id="save_to_file" /><span></span></span>
-      </label>
-      <label class="row">
-        <span>Copy to Clipboard</span>
-        <span class="switch"><input type="checkbox" id="copy_to_clipboard" /><span></span></span>
-      </label>
-      <label class="row" title="Drawing the cursor into captures is planned">
-        <span>Capture Cursor</span>
-        <span class="switch"><input type="checkbox" id="capture_cursor" disabled /><span></span></span>
-      </label>
-      <label class="row">
-        <span>Time Delay</span>
-        <select id="delay_secs" class="delay">
-          <option value="0">Off</option>
+    <button id="capture" class="capture-button">
+      <span>Capture</span>
+      <kbd id="capture_hotkey"></kbd>
+    </button>
+
+    <section class="options">
+      <label class="chip"><input type="checkbox" id="save_to_file" /> Save file</label>
+      <label class="chip"><input type="checkbox" id="copy_to_clipboard" /> Copy</label>
+      <label class="chip">Delay
+        <select id="delay_secs">
+          <option value="0">off</option>
           <option value="1">1 s</option>
           <option value="2">2 s</option>
           <option value="3">3 s</option>
@@ -61,20 +53,11 @@
           <option value="10">10 s</option>
         </select>
       </label>
+      <label class="chip disabled" title="Drawing the cursor into captures is planned"><input type="checkbox" id="capture_cursor" disabled /> Cursor</label>
+      <label class="chip disabled" title="The editor is planned"><input type="checkbox" id="preview_in_editor" disabled /> Open in editor</label>
     </section>
 
-    <section class="capture">
-      <button id="capture" class="capture-button">Capture</button>
-      <div id="capture_hotkey" class="hotkey-label"></div>
-    </section>
-
-    <footer class="bar">
-      <button class="link" disabled title="Presets are planned">&#9881; Presets</button>
-      <button id="hotkeys" class="link">&#9000; Hotkeys</button>
-      <span id="status" class="status" role="status"></span>
-      <button id="open_folder" class="link">Open folder</button>
-      <button class="link" disabled title="The editor is planned">&#9998; Open Editor</button>
-    </footer>
+    <footer id="status" class="status" role="status">Ready</footer>
   </main>
   <script src="toolbox.js"></script>
 </body>

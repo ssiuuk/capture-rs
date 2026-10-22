@@ -1,12 +1,12 @@
 # capture-rs
 
-A SnagIt-style screen capture tool for Windows, written in Rust with a [Tauri 2](https://tauri.app) UI.
+A screen capture tool for Windows, written in Rust with a [Tauri 2](https://tauri.app) UI.
 
 > Early work in progress. The capture toolbox comes first; the annotation editor is planned next.
 
 ## Features
 
-- **Capture toolbox** modelled on SnagIt's: selection mode, toggles for Save to File, Copy to Clipboard and Time Delay, and a big Capture button.
+- **Capture toolbox**: pick a capture mode, choose whether to save and/or copy, set a delay, and press Capture.
 - **Region, window or full screen.** With *Ask each time* (the default) a chooser appears after clicking Capture: Region (R), Window (W), Full screen (F), or All screens (A) on multi-monitor setups.
 - **Region selection** on a frozen copy of the screen. Drag an area, or click to take the window under the cursor. Arrow keys nudge the selection, Shift+arrows resize it, Enter or double-click captures, Esc or right-click starts over.
 - **Magnifier** that follows the cursor at 8x zoom, with a crosshair on the exact pixel, its screen position and its colour as hex.

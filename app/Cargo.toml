@@ -1,6 +1,6 @@
 [package]
 name = "capture-rs"
-description = "A SnagIt-style screen capture tool for Windows"
+description = "A screen capture tool for Windows"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

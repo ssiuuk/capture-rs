@@ -1,5 +1,5 @@
 [hidden] { display: none !important; }
-:root { --accent: #ff6a2b; font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; }
+:root { --accent: #14b8a6; font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none; }
 body.region { cursor: crosshair; }
 body.window { cursor: pointer; }
