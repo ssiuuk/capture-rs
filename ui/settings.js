@@ -6,14 +6,14 @@ const $ = (id) => document.getElementById(id);
 
 // Modifiers in the canonical order the app stores them in.
 const MODIFIERS = [['Ctrl', 'Ctrl'], ['Alt', 'Alt'], ['Shift', 'Shift'], ['Super', 'Win']];
-const KEYS = [
-  'PrintScreen', 'Pause', 'ScrollLock', 'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown', 'Space',
-  ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`),
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  ...Array.from({ length: 10 }, (_, i) => `Numpad${i}`),
-];
-const KEY_LABELS = { PrintScreen: 'Print Screen', ScrollLock: 'Scroll Lock', PageUp: 'Page Up', PageDown: 'Page Down', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right' };
+const KEY_LABELS = {
+  PrintScreen: 'Print Screen', ScrollLock: 'Scroll Lock', PageUp: 'Page Up', PageDown: 'Page Down',
+  ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+  Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
+  NumpadAdd: 'Num +', NumpadSubtract: 'Num -', NumpadMultiply: 'Num *', NumpadDivide: 'Num /',
+  NumpadDecimal: 'Num .', NumpadEnter: 'Num Enter',
+};
 const DEFAULTS = { image_format: 'png', jpeg_quality: 90, theme: 'system', start_minimized: true, hide_toolbox_while_capturing: true, show_magnifier: true, show_crosshairs: true, save_to_file: true, copy_to_clipboard: true, save_dir: null };
 const CHECKS = ['start_minimized', 'hide_toolbox_while_capturing', 'show_magnifier', 'show_crosshairs', 'save_to_file', 'copy_to_clipboard'];
 
@@ -21,7 +21,8 @@ let settings = null;
 let hotkeys = null;
 let autostart = false;
 let tab = 'general';
-// Rejected combos stay on screen with their error until changed: action -> { accelerator, error }.
+// Unsaved combos per action: { accelerator, error }. Modifiers ticked before
+// a key is chosen wait here, as do rejected combos with their error.
 let drafts = {};
 
 const keyLabel = (k) => KEY_LABELS[k] || k.replace(/^Numpad/, 'Num ');
@@ -33,9 +34,16 @@ function split(accelerator) {
   return { mods: new Set(parts), key };
 }
 
+// Sends only the changed fields; the app merges them into its current
+// settings, so overlapping saves cannot undo each other.
+let saveSeq = 0;
 async function save(patch) {
+  Object.assign(settings, patch);
+  const seq = ++saveSeq;
   try {
-    settings = await invoke('update_settings', { settings: { ...settings, ...patch } });
+    const saved = await invoke('update_settings', { patch });
+    // A reply to an older save must not hide a newer one still in flight.
+    if (seq === saveSeq) settings = saved;
   } catch (e) {
     alert(String(e));
   }
@@ -84,19 +92,23 @@ function renderHotkeys() {
     });
 
     const select = document.createElement('select');
-    const keys = key && !KEYS.includes(key) ? [key, ...KEYS] : KEYS;
+    const keys = key && !hotkeys.keys.includes(key) ? [key, ...hotkeys.keys] : hotkeys.keys;
     select.append(new Option('None', ''));
     for (const k of keys) select.append(new Option(keyLabel(k), k));
     select.value = key || '';
     fs.title = `Default: ${row.default ? prettyAccel(row.default) : 'none'}`;
     combo.append(select);
 
-    const changed = () => {
-      const chosen = boxes.filter((b) => b.checked).map((b) => b.dataset.mod);
-      assign(row.action, select.value ? [...chosen, select.value].join('+') : null);
-    };
-    for (const b of boxes) b.addEventListener('change', changed);
-    select.addEventListener('change', changed);
+    const chosen = () => boxes.filter((b) => b.checked).map((b) => b.dataset.mod);
+    for (const b of boxes) {
+      b.addEventListener('change', () => {
+        // No key yet: keep the modifiers on screen until one is picked.
+        if (!select.value) drafts[row.action] = { accelerator: chosen().join('+'), error: null };
+        else assign(row.action, [...chosen(), select.value].join('+'));
+      });
+    }
+    // Picking None clears the hotkey.
+    select.addEventListener('change', () => assign(row.action, select.value ? [...chosen(), select.value].join('+') : null));
     fs.append(legend, combo);
 
     if (error) {

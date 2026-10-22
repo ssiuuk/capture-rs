@@ -49,12 +49,19 @@ impl AppState {
         lock(&self.settings).clone()
     }
 
-    pub fn save_settings(&self, settings: Settings) -> Result<(), String> {
-        settings
-            .save(&self.settings_path)
+    /// Changes the settings and writes them to disk. The lock is held
+    /// throughout, so concurrent changes from different windows apply one
+    /// after another and none is lost.
+    pub fn modify_settings(
+        &self,
+        change: impl FnOnce(&Settings) -> Result<Settings, String>,
+    ) -> Result<Settings, String> {
+        let mut current = lock(&self.settings);
+        let next = change(&current)?;
+        next.save(&self.settings_path)
             .map_err(|e| format!("Could not save settings: {e}"))?;
-        *lock(&self.settings) = settings;
-        Ok(())
+        *current = next.clone();
+        Ok(next)
     }
 }
 

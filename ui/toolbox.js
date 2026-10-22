@@ -15,14 +15,15 @@ function render() {
   for (const b of modeButtons) b.setAttribute('aria-checked', String(b.dataset.mode === settings.capture_mode));
 }
 
-async function save() {
-  for (const name of fields) {
-    const el = $(name);
-    if (el.type === 'checkbox') settings[name] = el.checked;
-    else settings[name] = Number(el.value);
-  }
+// Sends only the changed fields, so changes made elsewhere are kept.
+let saveSeq = 0;
+async function save(patch) {
+  Object.assign(settings, patch);
+  const seq = ++saveSeq;
   try {
-    settings = await invoke('update_settings', { settings });
+    const saved = await invoke('update_settings', { patch });
+    // A reply to an older save must not hide a newer one still in flight.
+    if (seq === saveSeq) settings = saved;
     render();
   } catch (e) {
     setStatus(String(e), true);
@@ -42,12 +43,15 @@ async function refreshHotkeyLabel() {
   $('capture_hotkey').textContent = row && row.accelerator && !row.error ? row.accelerator : '';
 }
 
-for (const name of fields) $(name).addEventListener('change', save);
+for (const name of fields) {
+  $(name).addEventListener('change', (e) => {
+    save({ [name]: e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value) });
+  });
+}
 for (const b of modeButtons) {
   b.addEventListener('click', () => {
-    settings.capture_mode = b.dataset.mode;
+    save({ capture_mode: b.dataset.mode });
     render();
-    save();
   });
 }
 

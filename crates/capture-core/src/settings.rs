@@ -101,6 +101,30 @@ impl Settings {
         std::fs::rename(tmp, path)
     }
 
+    /// Applies a partial update, given as a JSON object of the fields to
+    /// change. Hotkeys are left alone; they have their own commands.
+    pub fn patched(&self, patch: &serde_json::Value) -> Result<Settings, String> {
+        let changes = patch
+            .as_object()
+            .ok_or("settings patch must be an object")?;
+        let mut merged = serde_json::to_value(self).map_err(|e| e.to_string())?;
+        let fields = merged
+            .as_object_mut()
+            .expect("Settings serializes to an object");
+        for (key, value) in changes {
+            if key == "hotkeys" {
+                continue;
+            }
+            if !fields.contains_key(key) {
+                return Err(format!("unknown setting \"{key}\""));
+            }
+            fields.insert(key.clone(), value.clone());
+        }
+        serde_json::from_value::<Settings>(merged)
+            .map(Settings::sanitized)
+            .map_err(|e| format!("invalid setting: {e}"))
+    }
+
     pub fn sanitized(mut self) -> Self {
         self.delay_secs = self.delay_secs.min(MAX_DELAY_SECS);
         self.jpeg_quality = self.jpeg_quality.clamp(1, 100);
@@ -128,6 +152,31 @@ mod tests {
             s.hotkeys.get(&HotkeyAction::Capture).map(String::as_str),
             Some("PrintScreen")
         );
+    }
+
+    #[test]
+    fn patches_change_only_their_own_fields() {
+        let s = Settings::default();
+        let s = s
+            .patched(&serde_json::json!({"show_magnifier": false}))
+            .unwrap();
+        let s = s
+            .patched(&serde_json::json!({"show_crosshairs": false}))
+            .unwrap();
+        assert!(!s.show_magnifier && !s.show_crosshairs);
+
+        let s = s
+            .patched(&serde_json::json!({"image_format": "jpeg", "jpeg_quality": 0, "hotkeys": {}}))
+            .unwrap();
+        assert_eq!(s.image_format, ImageFormat::Jpeg);
+        assert_eq!(s.jpeg_quality, 1);
+        assert_eq!(s.hotkeys, default_hotkeys());
+
+        assert!(s.patched(&serde_json::json!({"nope": 1})).is_err());
+        assert!(s
+            .patched(&serde_json::json!({"image_format": "gif"}))
+            .is_err());
+        assert!(s.patched(&serde_json::json!([1])).is_err());
     }
 
     #[test]
