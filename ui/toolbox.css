@@ -37,7 +37,7 @@
   background: rgba(255, 255, 255, 0.2);
 }
 .capture-button kbd:empty { display: none; }
-@media (prefers-color-scheme: dark) { .capture-button { color: #04201d; } .capture-button kbd { background: rgba(0, 0, 0, 0.15); } }
+@media (prefers-color-scheme: dark) { .capture-button { color: #082f49; } .capture-button kbd { background: rgba(0, 0, 0, 0.15); } }
 
 .options { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
 .chip {

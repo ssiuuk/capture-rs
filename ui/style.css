@@ -5,9 +5,9 @@
   --line: #dde1e6;
   --text: #1c2128;
   --muted: #667085;
-  --accent: #0d9488;
-  --accent-strong: #0f766e;
-  --accent-soft: rgba(13, 148, 136, 0.12);
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-soft: rgba(2, 132, 199, 0.12);
   --danger: #c2410c;
   color-scheme: light dark;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -21,9 +21,9 @@
     --line: #353a42;
     --text: #e7e9ec;
     --muted: #9aa3ae;
-    --accent: #2dd4bf;
-    --accent-strong: #14b8a6;
-    --accent-soft: rgba(45, 212, 191, 0.14);
+    --accent: #38bdf8;
+    --accent-strong: #0ea5e9;
+    --accent-soft: rgba(56, 189, 248, 0.14);
     --danger: #fb923c;
   }
 }

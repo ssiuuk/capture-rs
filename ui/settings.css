@@ -24,4 +24,4 @@ td.actions { text-align: right; width: 70px; }
 footer { margin-top: auto; display: flex; justify-content: space-between; padding-top: 12px; }
 footer button { padding: 6px 16px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
 footer .primary { background: var(--accent); border-color: var(--accent); color: white; }
-@media (prefers-color-scheme: dark) { footer .primary { color: #04201d; } }
+@media (prefers-color-scheme: dark) { footer .primary { color: #082f49; } }

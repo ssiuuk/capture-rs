@@ -81,7 +81,7 @@ function draw() {
     const w = clamp(r.x + r.width, 0, width) - x, h = clamp(r.y + r.height, 0, height) - y;
     if (w > 0 && h > 0) {
       ctx.drawImage(image, x, y, w, h, x, y, w, h);
-      ctx.strokeStyle = '#14b8a6';
+      ctx.strokeStyle = '#0ea5e9';
       ctx.lineWidth = 2 * px;
       ctx.strokeRect(x + px, y + px, w - 2 * px, h - 2 * px);
     }
@@ -89,7 +89,7 @@ function draw() {
 
   // Full-screen crosshair while aiming a region.
   if (mode === 'region' && cursor && !dragStart && !pending) {
-    ctx.fillStyle = 'rgba(20, 184, 166, 0.8)';
+    ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
     ctx.fillRect(0, cursor.y, width, px);
     ctx.fillRect(cursor.x, 0, px, height);
   }
@@ -125,7 +125,7 @@ function drawLoupe(e) {
 
   // Outline the exact pixel under the cursor and draw a crosshair to it.
   const c = half * cell;
-  loupeCtx.strokeStyle = 'rgba(20, 184, 166, 0.9)';
+  loupeCtx.strokeStyle = 'rgba(14, 165, 233, 0.9)';
   loupeCtx.lineWidth = Math.max(1, dpr);
   loupeCtx.beginPath();
   loupeCtx.moveTo(c + cell / 2, 0); loupeCtx.lineTo(c + cell / 2, c);
