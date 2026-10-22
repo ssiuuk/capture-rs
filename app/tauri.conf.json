@@ -13,8 +13,8 @@
         "label": "toolbox",
         "title": "capture-rs",
         "url": "toolbox.html",
-        "width": 760,
-        "height": 236,
+        "width": 600,
+        "height": 226,
         "resizable": false,
         "maximizable": false,
         "center": true

@@ -2,7 +2,8 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
-const fields = ['capture_mode', 'save_to_file', 'copy_to_clipboard', 'capture_cursor', 'preview_in_editor', 'delay_secs'];
+const fields = ['save_to_file', 'copy_to_clipboard', 'capture_cursor', 'preview_in_editor', 'delay_secs'];
+const modeButtons = [...document.querySelectorAll('.mode')];
 let settings = null;
 
 function render() {
@@ -11,17 +12,18 @@ function render() {
     if (el.type === 'checkbox') el.checked = !!settings[name];
     else el.value = String(settings[name]);
   }
+  for (const b of modeButtons) b.setAttribute('aria-checked', String(b.dataset.mode === settings.capture_mode));
 }
 
 async function save() {
   for (const name of fields) {
     const el = $(name);
     if (el.type === 'checkbox') settings[name] = el.checked;
-    else if (name === 'delay_secs') settings[name] = Number(el.value);
-    else settings[name] = el.value;
+    else settings[name] = Number(el.value);
   }
   try {
     settings = await invoke('update_settings', { settings });
+    render();
   } catch (e) {
     setStatus(String(e), true);
   }
@@ -41,9 +43,16 @@ async function refreshHotkeyLabel() {
 }
 
 for (const name of fields) $(name).addEventListener('change', save);
+for (const b of modeButtons) {
+  b.addEventListener('click', () => {
+    settings.capture_mode = b.dataset.mode;
+    render();
+    save();
+  });
+}
 
 $('capture').addEventListener('click', () => {
-  setStatus(settings.delay_secs > 0 ? `Capturing in ${settings.delay_secs} s...` : '');
+  setStatus(settings.delay_secs > 0 ? `Capturing in ${settings.delay_secs} s...` : 'Capturing...');
   invoke('start_capture', { mode: null });
 });
 $('hotkeys').addEventListener('click', () => invoke('open_hotkey_settings'));
