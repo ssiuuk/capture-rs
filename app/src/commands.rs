@@ -1,7 +1,7 @@
 //! Commands the web UI calls, plus helpers for showing app windows.
 
-use capture_core::hotkey::{default_hotkeys, normalize, HotkeyAction};
-use capture_core::settings::{CaptureMode, Settings};
+use capture_core::hotkey::{default_hotkeys, normalize, supported_keys, HotkeyAction};
+use capture_core::settings::{CaptureMode, Settings, Theme};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -45,7 +45,16 @@ pub fn show_toolbox(app: &AppHandle) {
     }
 }
 
-pub fn show_hotkey_settings(app: &AppHandle) {
+/// Applies the light/dark choice to every window, current and future.
+pub fn apply_theme(app: &AppHandle, theme: Theme) {
+    app.set_theme(match theme {
+        Theme::System => None,
+        Theme::Light => Some(tauri::Theme::Light),
+        Theme::Dark => Some(tauri::Theme::Dark),
+    });
+}
+
+pub fn show_preferences(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(SETTINGS) {
         let _ = w.unminimize();
         let _ = w.show();
@@ -53,8 +62,8 @@ pub fn show_hotkey_settings(app: &AppHandle) {
         return;
     }
     let built = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
-        .title("capture-rs hotkeys")
-        .inner_size(600.0, 470.0)
+        .title("capture-rs preferences")
+        .inner_size(560.0, 600.0)
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
@@ -63,7 +72,7 @@ pub fn show_hotkey_settings(app: &AppHandle) {
     if let Err(e) = built {
         notify_toolbox(
             app,
-            CaptureOutcome::failed(format!("Could not open hotkey settings: {e}")),
+            CaptureOutcome::failed(format!("Could not open preferences: {e}")),
         );
     }
 }
@@ -73,17 +82,80 @@ pub fn get_settings(state: tauri::State<'_, AppState>) -> Settings {
     state.settings()
 }
 
-/// Saves toolbox options. Hotkeys are managed by `set_hotkey` and are kept
-/// as they are, so the two windows cannot overwrite each other.
+/// Changes only the fields in `patch` (a JSON object), merged into the
+/// current settings, so windows never send back stale values for fields
+/// they did not touch. Hotkeys are managed by `set_hotkey`. Every window is
+/// sent the result.
 #[tauri::command]
 pub fn update_settings(
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
-    settings: Settings,
+    patch: serde_json::Value,
 ) -> Result<Settings, String> {
-    let mut next = settings.sanitized();
-    next.hotkeys = state.settings().hotkeys;
-    state.save_settings(next.clone())?;
+    let mut previous_theme = None;
+    let next = state.modify_settings(|current| {
+        previous_theme = Some(current.theme);
+        current.patched(&patch)
+    })?;
+    if previous_theme != Some(next.theme) {
+        apply_theme(&app, next.theme);
+    }
+    let _ = app.emit("settings-changed", &next);
     Ok(next)
+}
+
+/// Shows a folder picker for the save location; `None` if cancelled.
+#[tauri::command]
+pub async fn pick_save_folder(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let current = output::capture_dir(&app, &app.state::<AppState>().settings())?;
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_title("Save captures to")
+        .set_parent(&window);
+    if current.is_dir() {
+        dialog = dialog.set_directory(&current);
+    }
+    match dialog.blocking_pick_folder() {
+        Some(path) => path
+            .into_path()
+            .map(|p| Some(p.display().to_string()))
+            .map_err(|e| e.to_string()),
+        None => Ok(None),
+    }
+}
+
+/// The folder captures are saved to, after applying the default.
+#[tauri::command]
+pub fn get_capture_folder(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    output::capture_dir(&app, &state.settings()).map(|p| p.display().to_string())
+}
+
+#[tauri::command]
+pub fn get_autostart(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Adds or removes capture-rs from the programs Windows runs at sign-in.
+#[tauri::command]
+pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    let result = if enabled {
+        launcher.enable()
+    } else {
+        launcher.disable()
+    };
+    result.map_err(|e| format!("Could not change the Windows startup setting: {e}"))?;
+    launcher.is_enabled().map_err(|e| e.to_string())
 }
 
 /// `mode` = None uses the toolbox's selected mode.
@@ -94,8 +166,8 @@ pub async fn start_capture(app: AppHandle, mode: Option<CaptureMode>) {
 }
 
 #[tauri::command]
-pub async fn open_hotkey_settings(app: AppHandle) {
-    show_hotkey_settings(&app);
+pub async fn open_preferences(app: AppHandle) {
+    show_preferences(&app);
 }
 
 #[tauri::command]
@@ -120,6 +192,8 @@ pub struct HotkeyRow {
 #[derive(Serialize)]
 pub struct HotkeyStatus {
     rows: Vec<HotkeyRow>,
+    /// Every key the picker can offer, in display order.
+    keys: Vec<String>,
     /// Print Screen is assigned but Windows sends it to Snipping Tool.
     print_screen_taken_by_windows: bool,
 }
@@ -139,6 +213,7 @@ fn hotkey_status(state: &AppState) -> HotkeyStatus {
                 error: errors.get(a).cloned(),
             })
             .collect(),
+        keys: supported_keys(),
         print_screen_taken_by_windows: uses_print_screen
             && platform::print_screen_opens_snipping_tool(),
     }
@@ -158,17 +233,17 @@ pub async fn set_hotkey(
     accelerator: Option<String>,
 ) -> Result<HotkeyStatus, String> {
     let state = app.state::<AppState>();
-    let mut settings = state.settings();
-    match accelerator {
-        Some(a) => {
-            let canonical = normalize(&a).map_err(|e| e.to_string())?;
-            settings.hotkeys.insert(action, canonical);
-        }
-        None => {
-            settings.hotkeys.remove(&action);
-        }
-    }
-    state.save_settings(settings)?;
+    let canonical = accelerator
+        .map(|a| normalize(&a).map_err(|e| e.to_string()))
+        .transpose()?;
+    state.modify_settings(|current| {
+        let mut next = current.clone();
+        match canonical {
+            Some(a) => next.hotkeys.insert(action, a),
+            None => next.hotkeys.remove(&action),
+        };
+        Ok(next)
+    })?;
     hotkeys::apply(&app);
     let _ = app.emit("hotkeys-changed", ());
     Ok(hotkey_status(&state))
@@ -177,9 +252,12 @@ pub async fn set_hotkey(
 #[tauri::command]
 pub async fn reset_hotkeys(app: AppHandle) -> Result<HotkeyStatus, String> {
     let state = app.state::<AppState>();
-    let mut settings = state.settings();
-    settings.hotkeys = default_hotkeys();
-    state.save_settings(settings)?;
+    state.modify_settings(|current| {
+        Ok(Settings {
+            hotkeys: default_hotkeys(),
+            ..current.clone()
+        })
+    })?;
     hotkeys::apply(&app);
     let _ = app.emit("hotkeys-changed", ());
     Ok(hotkey_status(&state))

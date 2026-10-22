@@ -192,6 +192,66 @@ fn key_name(token: &str) -> Option<String> {
         .map(|n| n.to_string())
 }
 
+/// Every key `normalize` accepts, in canonical spelling and in the order a
+/// key picker should list them.
+pub fn supported_keys() -> Vec<String> {
+    let mut keys: Vec<String> = [
+        "PrintScreen",
+        "Pause",
+        "ScrollLock",
+        "Insert",
+        "Delete",
+        "Home",
+        "End",
+        "PageUp",
+        "PageDown",
+        "Space",
+        "Tab",
+        "Enter",
+        "Backspace",
+    ]
+    .iter()
+    .map(|k| k.to_string())
+    .collect();
+    keys.extend((1..=24).map(|n| format!("F{n}")));
+    keys.extend(('A'..='Z').chain('0'..='9').map(String::from));
+    keys.extend(
+        [
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "Backquote",
+            "Minus",
+            "Equal",
+            "BracketLeft",
+            "BracketRight",
+            "Backslash",
+            "Semicolon",
+            "Quote",
+            "Comma",
+            "Period",
+            "Slash",
+        ]
+        .iter()
+        .map(|k| k.to_string()),
+    );
+    keys.extend((0..=9).map(|n| format!("Numpad{n}")));
+    keys.extend(
+        [
+            "NumpadAdd",
+            "NumpadSubtract",
+            "NumpadMultiply",
+            "NumpadDivide",
+            "NumpadDecimal",
+            "NumpadEnter",
+        ]
+        .iter()
+        .map(|k| k.to_string()),
+    );
+    keys
+}
+
 /// Parses an accelerator in any accepted spelling and returns it in
 /// canonical form: modifiers in the order Ctrl, Alt, Shift, Super, then
 /// the key, joined by `+`.
@@ -296,5 +356,19 @@ mod tests {
                 "Ctrl+Shift+R".into()
             )]
         );
+    }
+
+    #[test]
+    fn every_supported_key_is_accepted_once() {
+        let keys = supported_keys();
+        let unique: std::collections::BTreeSet<_> = keys.iter().collect();
+        assert_eq!(unique.len(), keys.len());
+        for key in &keys {
+            assert_eq!(
+                normalize(&format!("Ctrl+{key}")).unwrap(),
+                format!("Ctrl+{key}")
+            );
+        }
+        assert!(keys.contains(&"F24".to_string()) && keys.contains(&"Minus".to_string()));
     }
 }

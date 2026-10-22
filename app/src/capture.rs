@@ -57,11 +57,13 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
     let state = app.state::<AppState>();
     let settings = state.settings();
 
-    if let Some(w) = app.get_webview_window(TOOLBOX) {
-        let _ = w.hide();
+    if settings.hide_toolbox_while_capturing {
+        if let Some(w) = app.get_webview_window(TOOLBOX) {
+            let _ = w.hide();
+        }
+        // Let the toolbox finish disappearing before grabbing the screen.
+        std::thread::sleep(Duration::from_millis(250));
     }
-    // Let the toolbox finish disappearing, then honour the delay setting.
-    std::thread::sleep(Duration::from_millis(250));
     if settings.delay_secs > 0 {
         count_down(app, settings.delay_secs);
     }
@@ -263,6 +265,8 @@ pub struct OverlayInit {
     mode: CaptureMode,
     /// Path to pass to `convertFileSrc(path, 'snapshot')`.
     image_path: String,
+    show_magnifier: bool,
+    show_crosshairs: bool,
 }
 
 #[tauri::command]
@@ -270,6 +274,7 @@ pub fn overlay_init(app: AppHandle, monitor: usize) -> Result<OverlayInit, Strin
     let state = app.state::<AppState>();
     let session = lock(&state.session);
     let s = session.as_ref().ok_or("No capture in progress")?;
+    let settings = state.settings();
     let info = s
         .snapshot
         .monitors
@@ -284,6 +289,8 @@ pub fn overlay_init(app: AppHandle, monitor: usize) -> Result<OverlayInit, Strin
         windows: s.snapshot.windows.clone(),
         mode: s.mode,
         image_path: format!("s{}-m{monitor}.png", s.id),
+        show_magnifier: settings.show_magnifier,
+        show_crosshairs: settings.show_crosshairs,
     })
 }
 

@@ -13,6 +13,9 @@ use tauri::{Manager, WindowEvent};
 
 use crate::state::AppState;
 
+/// Passed by the Windows startup entry so we know we were not opened by hand.
+const AUTOSTART_ARG: &str = "--autostart";
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -23,11 +26,24 @@ fn main() {
                 .with_handler(hotkeys::on_shortcut)
                 .build(),
         )
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args([AUTOSTART_ARG])
+                .build(),
+        )
+        .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("snapshot", capture::serve_snapshot)
         .setup(|app| {
             app.manage(AppState::load(app.handle())?);
             tray::create(app.handle())?;
             hotkeys::apply(app.handle());
+            let settings = app.state::<AppState>().settings();
+            commands::apply_theme(app.handle(), settings.theme);
+            // Launched at Windows sign-in: optionally stay in the tray.
+            let at_sign_in = std::env::args().any(|a| a == AUTOSTART_ARG);
+            if !(at_sign_in && settings.start_minimized) {
+                commands::show_toolbox(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -43,7 +59,11 @@ fn main() {
             commands::get_settings,
             commands::update_settings,
             commands::start_capture,
-            commands::open_hotkey_settings,
+            commands::open_preferences,
+            commands::pick_save_folder,
+            commands::get_capture_folder,
+            commands::get_autostart,
+            commands::set_autostart,
             commands::open_capture_folder,
             commands::get_hotkeys,
             commands::set_hotkey,

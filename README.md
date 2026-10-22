@@ -12,7 +12,8 @@ A screen capture tool for Windows, written in Rust with a [Tauri 2](https://taur
 - **Magnifier** that follows the cursor at 8x zoom, with a crosshair on the exact pixel, its screen position and its colour as hex.
 - **Configurable global hotkeys** for capture, region, window, full screen, repeat last capture and show toolbox. Conflicts and keys already taken by Windows are flagged.
 - **Tray icon.** Closing the toolbox hides it to the tray.
-- Captures are saved as PNG to `Pictures\capture-rs` and/or copied to the clipboard.
+- Captures are saved as PNG, JPEG, BMP or TIFF to `Pictures\capture-rs` (or a folder you choose) and/or copied to the clipboard.
+- **Preferences** window (toolbox link or tray menu): start with Windows, save folder and format, theme, magnifier and crosshair options, and hotkeys.
 
 Planned: annotation editor (arrows, shapes, text, blur, crop), cursor capture, scrolling capture, video recording.
 
@@ -26,7 +27,7 @@ Planned: annotation editor (arrows, shapes, text, blur, crop), cursor capture, s
 | Capture full screen | Ctrl+Print Screen |
 | Repeat last capture | Ctrl+Shift+Print Screen |
 
-On Windows 11, Print Screen opens Snipping Tool by default. Turn off **Settings > Accessibility > Keyboard > Use the Print screen key to open screen capture**, or pick other hotkeys in the Hotkeys window.
+On Windows 11, Print Screen opens Snipping Tool by default. Turn off **Settings > Accessibility > Keyboard > Use the Print screen key to open screen capture**, or pick other hotkeys in Preferences > Hotkeys.
 
 ## Download
 
@@ -50,7 +51,7 @@ The UI is plain HTML/CSS/JS in `ui/`, so no Node build step is needed to run the
 | --- | --- |
 | `crates/capture-core` | Platform-independent logic: geometry, desktop snapshot compositing and cropping, settings, hotkey parsing. Tested on any OS. |
 | `app` | The Tauri app: tray, global hotkeys, screen grabbing (via `xcap`), overlay windows, saving and clipboard. |
-| `ui` | Web pages for the toolbox, the capture overlay and the hotkey settings. |
+| `ui` | Web pages for the toolbox, the capture overlay, the countdown and Preferences. |
 
 On Linux or macOS, `cargo test -p capture-core` runs the core tests, and `cargo check -p capture-rs --target x86_64-pc-windows-gnu` type-checks the Windows app.
 
