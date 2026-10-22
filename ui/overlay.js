@@ -14,7 +14,7 @@ const LOUPE_CSS = 136;
 const LOUPE_SRC = LOUPE_CSS / ZOOM; // 17 source pixels across
 const MIN_DRAG = 4; // smaller drags count as a click
 const DIM = 0.45;
-const FADE_MS = 200;
+const FADE_MS = 500; // dimming eases in on open and back out on close
 
 const canvas = $('screen');
 const ctx = canvas.getContext('2d');
@@ -113,7 +113,7 @@ function updateSizeLabel(r) {
 
 function drawLoupe(e) {
   const loupe = $('loupe');
-  if (!cursor || mode === 'choose' || pending) { loupe.hidden = true; return; }
+  if (!cursor || mode === 'choose' || pending || finished) { loupe.hidden = true; return; }
   loupe.hidden = false;
 
   const dpr = window.devicePixelRatio || 1;
@@ -195,9 +195,17 @@ function showActions() {
   el.style.top = `${top}px`;
 }
 
+// Hides the controls and eases the dimming back out on every monitor, so
+// the screen returns to normal gradually before the overlays close.
+async function closeGently() {
+  finished = true;
+  emit('overlay-closing', { session: info.session });
+  await fadeOut();
+}
+
 async function finish(globalArea) {
   if (finished) return;
-  finished = true;
+  await closeGently();
   try {
     await invoke('overlay_finish', { area: globalArea });
   } catch (e) {
@@ -206,16 +214,16 @@ async function finish(globalArea) {
   }
 }
 
-function cancel() {
+async function cancel() {
   if (finished) return;
-  finished = true;
+  if (info) await closeGently();
   invoke('overlay_cancel');
 }
 
 // ---- input ----------------------------------------------------------------
 
 window.addEventListener('mousemove', (e) => {
-  if (!info) return;
+  if (!info || finished) return;
   cursor = toLocal(e);
   if (dragStart) selection = rectFromCorners(dragStart, cursor);
   hoverWindow = dragStart || pending ? null : windowAt(cursor);
@@ -321,6 +329,12 @@ $('cancel').addEventListener('click', cancel);
 listen('overlay-mode', ({ payload }) => {
   if (info && payload.session === info.session && payload.mode !== mode) setMode(payload.mode);
 });
+listen('overlay-closing', ({ payload }) => {
+  if (info && payload.session === info.session && !finished) {
+    finished = true;
+    fadeOut();
+  }
+});
 listen('overlay-selection-start', ({ payload }) => {
   if (info && payload.session === info.session && payload.monitor !== monitorIndex) resetSelection();
 });
@@ -363,15 +377,35 @@ async function start() {
   fadeIn();
 }
 
-function fadeIn() {
+let fadeToken = 0;
+
+// Animates `dim` from its current value to `target` with ease-in-out.
+function fadeTo(target) {
+  const token = ++fadeToken;
+  const from = dim;
   const t0 = performance.now();
-  const step = (now) => {
-    const t = Math.min(1, (now - t0) / FADE_MS);
-    dim = DIM * (1 - (1 - t) * (1 - t)); // ease-out
-    draw();
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  return new Promise((resolve) => {
+    const step = (now) => {
+      if (token !== fadeToken) return resolve(); // superseded by a newer fade
+      const t = Math.min(1, (now - t0) / FADE_MS);
+      const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      dim = from + (target - from) * eased;
+      draw();
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+const fadeIn = () => fadeTo(DIM);
+
+function fadeOut() {
+  for (const id of ['chooser', 'actions', 'loupe', 'size', 'hint']) $(id).hidden = true;
+  selection = null;
+  hoverWindow = null;
+  cursor = null;
+  return fadeTo(0);
 }
 
 window.addEventListener('resize', () => { if (info && image) requestDraw(); });

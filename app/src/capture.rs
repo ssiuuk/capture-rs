@@ -61,9 +61,10 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
         let _ = w.hide();
     }
     // Let the toolbox finish disappearing, then honour the delay setting.
-    std::thread::sleep(
-        Duration::from_millis(250) + Duration::from_secs(settings.delay_secs.into()),
-    );
+    std::thread::sleep(Duration::from_millis(250));
+    if settings.delay_secs > 0 {
+        count_down(app, settings.delay_secs);
+    }
 
     let snapshot = Arc::new(platform::grab_desktop()?);
     let cursor = app.cursor_position().ok().map(|p| (p.x as i32, p.y as i32));
@@ -142,6 +143,60 @@ fn open_overlay(
         .set_size(PhysicalSize::new(b.width, b.height))
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+const COUNTDOWN: &str = "countdown";
+/// Size of the countdown window in logical pixels.
+const COUNTDOWN_SIZE: f64 = 200.0;
+
+/// Shows a countdown in the middle of the monitor under the cursor, waits
+/// `secs` seconds, and removes it again before the screen is grabbed. The
+/// countdown is cosmetic: if its window cannot be shown, the delay still runs.
+fn count_down(app: &AppHandle, secs: u8) {
+    let window = open_countdown(app, secs)
+        .map_err(|e| log::warn!("countdown window: {e}"))
+        .ok();
+    for left in (1..=secs).rev() {
+        let _ = app.emit_to(COUNTDOWN, "countdown-tick", left);
+        std::thread::sleep(Duration::from_secs(1));
+    }
+    if let Some(w) = window {
+        let _ = w.destroy();
+        // Give the compositor a moment so the countdown is not captured.
+        std::thread::sleep(Duration::from_millis(150));
+    }
+}
+
+fn open_countdown(app: &AppHandle, secs: u8) -> tauri::Result<WebviewWindow> {
+    let url = WebviewUrl::App(format!("countdown.html?secs={secs}").into());
+    let window = WebviewWindowBuilder::new(app, COUNTDOWN, url)
+        .title("capture-rs countdown")
+        .inner_size(COUNTDOWN_SIZE, COUNTDOWN_SIZE)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(false)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .focused(false)
+        .visible(false)
+        .build()?;
+    let monitor = app
+        .cursor_position()
+        .ok()
+        .and_then(|c| app.monitor_from_point(c.x, c.y).ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten());
+    if let Some(m) = monitor {
+        let side = (COUNTDOWN_SIZE * m.scale_factor()) as i32;
+        let (pos, size) = (m.position(), m.size());
+        let x = pos.x + (size.width as i32 - side) / 2;
+        let y = pos.y + (size.height as i32 - side) / 2;
+        window.set_position(PhysicalPosition::new(x, y))?;
+    }
+    // Clicks pass through to whatever is being set up for the capture.
+    window.set_ignore_cursor_events(true)?;
+    window.show()?;
+    Ok(window)
 }
 
 /// Crops, saves and copies the capture, then releases the capture. On error

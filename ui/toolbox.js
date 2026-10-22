@@ -70,6 +70,7 @@ listen('capture-cancelled', () => setStatus('Capture cancelled'));
 listen('hotkeys-changed', refreshHotkeyLabel);
 
 (async () => {
+  window.__TAURI__.app.getVersion().then((v) => { $('version').textContent = v; }).catch(() => {});
   settings = await invoke('get_settings');
   render();
   refreshHotkeyLabel();
