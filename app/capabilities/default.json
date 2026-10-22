@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissions for the toolbox, settings and capture overlay windows.",
-  "windows": ["toolbox", "settings", "overlay-*"],
+  "windows": ["toolbox", "settings", "overlay-*", "countdown"],
   "permissions": ["core:default", "core:window:allow-set-focus", "core:window:allow-close"]
 }

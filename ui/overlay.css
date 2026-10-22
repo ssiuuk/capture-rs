@@ -6,7 +6,7 @@ body.window { cursor: pointer; }
 #screen { position: fixed; inset: 0; width: 100vw; height: 100vh; }
 /* The overlay opens on an exact copy of the screen, then the dimming and
    controls fade in, so starting a capture never flashes dark. */
-.chooser, .hint { animation: fade-in 0.2s ease-out both; }
+.chooser, .hint { animation: fade-in 0.5s ease-in-out both; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 kbd {
   font: 11px "Segoe UI", sans-serif; padding: 1px 5px; border-radius: 3px;

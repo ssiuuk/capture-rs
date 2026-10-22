@@ -14,7 +14,7 @@ const LOUPE_CSS = 136;
 const LOUPE_SRC = LOUPE_CSS / ZOOM; // 17 source pixels across
 const MIN_DRAG = 4; // smaller drags count as a click
 const DIM = 0.45;
-const FADE_MS = 200;
+const FADE_MS = 500; // dimming eases in on open and back out on close
 
 const canvas = $('screen');
 const ctx = canvas.getContext('2d');
@@ -113,7 +113,7 @@ function updateSizeLabel(r) {
 
 function drawLoupe(e) {
   const loupe = $('loupe');
-  if (!cursor || mode === 'choose' || pending) { loupe.hidden = true; return; }
+  if (!cursor || mode === 'choose' || pending || finished) { loupe.hidden = true; return; }
   loupe.hidden = false;
 
   const dpr = window.devicePixelRatio || 1;
@@ -195,9 +195,17 @@ function showActions() {
   el.style.top = `${top}px`;
 }
 
+// Hides the controls and eases the dimming back out on every monitor, so
+// the screen returns to normal gradually before the overlays close.
+async function closeGently() {
+  finished = true;
+  emit('overlay-closing', { session: info.session });
+  await fadeOut();
+}
+
 async function finish(globalArea) {
   if (finished) return;
-  finished = true;
+  await closeGently();
   try {
     await invoke('overlay_finish', { area: globalArea });
   } catch (e) {
@@ -206,16 +214,19 @@ async function finish(globalArea) {
   }
 }
 
-function cancel() {
+async function cancel() {
   if (finished) return;
-  finished = true;
+  if (info) await closeGently();
   invoke('overlay_cancel');
 }
 
 // ---- input ----------------------------------------------------------------
 
+// Input only counts once the overlay is set up and until it starts closing.
+const live = () => info && !finished;
+
 window.addEventListener('mousemove', (e) => {
-  if (!info) return;
+  if (!live()) return;
   cursor = toLocal(e);
   if (dragStart) selection = rectFromCorners(dragStart, cursor);
   hoverWindow = dragStart || pending ? null : windowAt(cursor);
@@ -225,14 +236,14 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseenter', () => {
   // Keyboard shortcuts go to the monitor the mouse is on.
-  if (info && !document.hasFocus()) getCurrentWindow().setFocus().catch(() => {});
+  if (live() && !document.hasFocus()) getCurrentWindow().setFocus().catch(() => {});
 });
 
 const insideSelection = (p) => selection && p.x >= selection.x && p.x < selection.x + selection.width
   && p.y >= selection.y && p.y < selection.y + selection.height;
 
 canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0 || !info) return;
+  if (e.button !== 0 || !live()) return;
   if (mode === 'region') {
     const at = toLocal(e);
     // A click inside a pending selection keeps it, so a double-click can
@@ -247,7 +258,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
-  if (e.button !== 0 || !info) return;
+  if (e.button !== 0 || !live()) return;
   if (mode === 'window') {
     const w = windowAt(toLocal(e));
     return finish(w ? w.bounds : info.monitor.bounds);
@@ -272,16 +283,17 @@ window.addEventListener('mouseup', (e) => {
   drawLoupe(e);
 });
 
-canvas.addEventListener('dblclick', () => { if (pending) finish(toGlobal(selection)); });
+canvas.addEventListener('dblclick', () => { if (live() && pending) finish(toGlobal(selection)); });
 
 window.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  if (!live()) return;
   if (pending || dragStart) resetSelection();
   else cancel();
 });
 
 window.addEventListener('keydown', (e) => {
-  if (!info) return;
+  if (!live()) return;
   if (e.key === 'Escape') {
     e.preventDefault();
     return pending || dragStart ? resetSelection() : cancel();
@@ -311,18 +323,24 @@ window.addEventListener('keydown', (e) => {
 
 $('chooser').addEventListener('click', (e) => {
   const button = e.target.closest('button');
-  if (button) setMode(button.dataset.mode, true);
+  if (button && live()) setMode(button.dataset.mode, true);
 });
-$('confirm').addEventListener('click', () => finish(toGlobal(selection)));
-$('redo').addEventListener('click', resetSelection);
+$('confirm').addEventListener('click', () => { if (live() && selection) finish(toGlobal(selection)); });
+$('redo').addEventListener('click', () => { if (live()) resetSelection(); });
 $('cancel').addEventListener('click', cancel);
 
 // Keep all monitors' overlays in the same mode, with one selection at a time.
 listen('overlay-mode', ({ payload }) => {
-  if (info && payload.session === info.session && payload.mode !== mode) setMode(payload.mode);
+  if (live() && payload.session === info.session && payload.mode !== mode) setMode(payload.mode);
+});
+listen('overlay-closing', ({ payload }) => {
+  if (info && payload.session === info.session && !finished) {
+    finished = true;
+    fadeOut();
+  }
 });
 listen('overlay-selection-start', ({ payload }) => {
-  if (info && payload.session === info.session && payload.monitor !== monitorIndex) resetSelection();
+  if (live() && payload.session === info.session && payload.monitor !== monitorIndex) resetSelection();
 });
 
 // ---- startup --------------------------------------------------------------
@@ -363,15 +381,37 @@ async function start() {
   fadeIn();
 }
 
-function fadeIn() {
+let fadeToken = 0;
+
+// Animates `dim` from its current value to `target` with ease-in-out.
+function fadeTo(target) {
+  const token = ++fadeToken;
+  const from = dim;
   const t0 = performance.now();
-  const step = (now) => {
-    const t = Math.min(1, (now - t0) / FADE_MS);
-    dim = DIM * (1 - (1 - t) * (1 - t)); // ease-out
-    draw();
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  return new Promise((resolve) => {
+    const step = (now) => {
+      if (token !== fadeToken) return resolve(); // superseded by a newer fade
+      const t = Math.min(1, (now - t0) / FADE_MS);
+      const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      dim = from + (target - from) * eased;
+      draw();
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+const fadeIn = () => fadeTo(DIM);
+
+function fadeOut() {
+  for (const id of ['chooser', 'actions', 'loupe', 'size', 'hint']) $(id).hidden = true;
+  selection = null;
+  dragStart = null;
+  pending = false;
+  hoverWindow = null;
+  cursor = null;
+  return fadeTo(0);
 }
 
 window.addEventListener('resize', () => { if (info && image) requestDraw(); });
