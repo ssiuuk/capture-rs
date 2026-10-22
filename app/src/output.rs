@@ -1,4 +1,4 @@
-//! Where a finished capture goes: a PNG file and/or the clipboard.
+//! Where a finished capture goes: an image file and/or the clipboard.
 
 use std::path::PathBuf;
 
@@ -31,7 +31,7 @@ pub fn deliver(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Captu
     let mut problems = Vec::new();
 
     if settings.save_to_file {
-        match save_png(app, settings, image) {
+        match save_file(app, settings, image) {
             Ok(path) => outcome.path = Some(path.display().to_string()),
             Err(e) => problems.push(e),
         }
@@ -49,16 +49,22 @@ pub fn deliver(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Captu
     outcome
 }
 
-fn save_png(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Result<PathBuf, String> {
+fn save_file(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Result<PathBuf, String> {
     let dir = capture_dir(app, settings)?;
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    let format = settings.image_format;
+    let bytes = format
+        .encode(image, settings.jpeg_quality)
+        .map_err(|e| format!("Could not encode the capture: {e}"))?;
     let now = local_now();
-    let name = capture_file_name(now.0, now.1, now.2, now.3, now.4, now.5);
+    let name = capture_file_name(
+        (now.0, now.1, now.2),
+        (now.3, now.4, now.5),
+        format.extension(),
+    );
     let path = unique_path(&dir, &name, |p| p.exists());
-    image
-        .save(&path)
-        .map_err(|e| format!("Could not save {}: {e}", path.display()))?;
+    std::fs::write(&path, bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
     Ok(path)
 }
 

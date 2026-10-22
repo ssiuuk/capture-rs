@@ -55,7 +55,7 @@ $('capture').addEventListener('click', () => {
   setStatus(settings.delay_secs > 0 ? `Capturing in ${settings.delay_secs} s...` : 'Capturing...');
   invoke('start_capture', { mode: null });
 });
-$('hotkeys').addEventListener('click', () => invoke('open_hotkey_settings'));
+$('preferences').addEventListener('click', () => invoke('open_preferences'));
 $('open_folder').addEventListener('click', () => invoke('open_capture_folder').catch((e) => setStatus(String(e), true)));
 
 listen('capture-done', ({ payload: r }) => {
@@ -68,6 +68,7 @@ listen('capture-done', ({ payload: r }) => {
 });
 listen('capture-cancelled', () => setStatus('Capture cancelled'));
 listen('hotkeys-changed', refreshHotkeyLabel);
+listen('settings-changed', ({ payload }) => { settings = payload; render(); });
 
 (async () => {
   window.__TAURI__.app.getVersion().then((v) => { $('version').textContent = v; }).catch(() => {});

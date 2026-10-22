@@ -17,7 +17,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &item("fullscreen", "Capture full screen")?,
             &PredefinedMenuItem::separator(app)?,
             &item("toolbox", "Show toolbox")?,
-            &item("hotkeys", "Hotkeys...")?,
+            &item("preferences", "Preferences...")?,
             &PredefinedMenuItem::separator(app)?,
             &item("quit", "Quit capture-rs")?,
         ],
@@ -33,7 +33,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "window" => run_action(app, HotkeyAction::CaptureWindow),
             "fullscreen" => run_action(app, HotkeyAction::CaptureFullScreen),
             "toolbox" => commands::show_toolbox(app),
-            "hotkeys" => commands::show_hotkey_settings(app),
+            "preferences" => commands::show_preferences(app),
             "quit" => app.exit(0),
             _ => {}
         })

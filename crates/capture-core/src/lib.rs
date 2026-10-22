@@ -4,6 +4,7 @@
 //! any platform. The Tauri app in `app/` wires it to the OS.
 
 pub mod desktop;
+pub mod format;
 pub mod geom;
 pub mod hotkey;
 pub mod naming;

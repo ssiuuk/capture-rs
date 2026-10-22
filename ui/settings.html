@@ -2,24 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>capture-rs hotkeys</title>
+  <title>capture-rs preferences</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
   <main class="settings">
-    <h1>Hotkeys</h1>
-    <p class="lead">Click a shortcut and press the keys you want. Esc cancels.</p>
-    <div id="warning" class="warning" hidden>
-      Windows is set to open Snipping Tool when you press Print Screen, so capture-rs may not receive it.
-      <button id="open_keyboard_settings" class="link">Open Windows keyboard settings</button>
-    </div>
-    <table>
-      <tbody id="rows"></tbody>
-    </table>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="general" aria-selected="true">General</button>
+      <button role="tab" data-tab="capture" aria-selected="false">Capture</button>
+      <button role="tab" data-tab="hotkeys" aria-selected="false">Hotkeys</button>
+    </nav>
+
+    <section id="tab-general" class="panel" role="tabpanel">
+      <h2>Startup</h2>
+      <label class="check"><input type="checkbox" id="autostart" /> Run capture-rs when Windows starts</label>
+      <label class="check sub"><input type="checkbox" id="start_minimized" /> Start hidden in the tray</label>
+      <div class="error" id="autostart_error" hidden></div>
+
+      <h2>Saving</h2>
+      <div class="row">
+        <span class="label">Save to</span>
+        <input type="text" id="save_dir" readonly />
+        <button id="browse">Browse...</button>
+      </div>
+      <div class="row indent">
+        <button class="link" id="default_dir">Use default folder</button>
+        <button class="link" id="open_dir">Open folder</button>
+      </div>
+      <div class="row">
+        <label class="label" for="image_format">File format</label>
+        <select id="image_format">
+          <option value="png">PNG (lossless)</option>
+          <option value="jpeg">JPEG (smaller, lossy)</option>
+          <option value="bmp">BMP (uncompressed)</option>
+          <option value="tiff">TIFF</option>
+        </select>
+      </div>
+      <div class="row" id="jpeg_row">
+        <label class="label" for="jpeg_quality">JPEG quality</label>
+        <input type="range" id="jpeg_quality" min="10" max="100" step="5" />
+        <output id="jpeg_quality_value"></output>
+      </div>
+
+      <h2>Appearance</h2>
+      <div class="row">
+        <label class="label" for="theme">Theme</label>
+        <select id="theme">
+          <option value="system">Same as Windows</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="tab-capture" class="panel" role="tabpanel" hidden>
+      <h2>While capturing</h2>
+      <label class="check"><input type="checkbox" id="hide_toolbox_while_capturing" /> Hide the toolbox while capturing</label>
+      <label class="check"><input type="checkbox" id="show_magnifier" /> Show the magnifier next to the cursor</label>
+      <label class="check"><input type="checkbox" id="show_crosshairs" /> Show crosshair lines when selecting a region</label>
+      <h2>After capturing</h2>
+      <label class="check"><input type="checkbox" id="save_to_file" /> Save to a file</label>
+      <label class="check"><input type="checkbox" id="copy_to_clipboard" /> Copy to the clipboard</label>
+    </section>
+
+    <section id="tab-hotkeys" class="panel" role="tabpanel" hidden>
+      <div id="warning" class="warning" hidden>
+        Windows is set to open Snipping Tool when you press Print Screen, so capture-rs may not receive it.
+        <button id="open_keyboard_settings" class="link">Open Windows keyboard settings</button>
+      </div>
+      <div id="hotkey_groups" class="hotkey-groups"></div>
+      <p class="note">If another app already owns a shortcut, Windows will not give it to capture-rs and it is marked in red. Pick another key or close that app.</p>
+    </section>
+
     <footer>
-      <button id="reset">Reset to defaults</button>
-      <button id="close" class="primary">Done</button>
+      <button id="restore">Restore defaults</button>
+      <button id="close" class="primary">Close</button>
     </footer>
   </main>
   <script src="settings.js"></script>

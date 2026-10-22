@@ -2,16 +2,13 @@
 
 use std::path::{Path, PathBuf};
 
-/// `capture-2026-10-21_013900.png` for the given local date-time parts.
+/// `capture-2026-10-21_013900.<extension>` for the given local date-time parts.
 pub fn capture_file_name(
-    year: i32,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
+    (year, month, day): (i32, u32, u32),
+    (hour, minute, second): (u32, u32, u32),
+    extension: &str,
 ) -> String {
-    format!("capture-{year:04}-{month:02}-{day:02}_{hour:02}{minute:02}{second:02}.png")
+    format!("capture-{year:04}-{month:02}-{day:02}_{hour:02}{minute:02}{second:02}.{extension}")
 }
 
 /// Returns `dir/name`, or `dir/stem-2.ext`, `dir/stem-3.ext`, ... if taken.
@@ -37,8 +34,8 @@ mod tests {
     #[test]
     fn file_name_is_sortable() {
         assert_eq!(
-            capture_file_name(2026, 10, 21, 1, 39, 0),
-            "capture-2026-10-21_013900.png"
+            capture_file_name((2026, 10, 21), (1, 39, 0), "jpg"),
+            "capture-2026-10-21_013900.jpg"
         );
     }
 

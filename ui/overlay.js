@@ -91,7 +91,7 @@ function draw() {
   }
 
   // Full-screen crosshair while aiming a region.
-  if (mode === 'region' && cursor && !dragStart && !pending) {
+  if (info.show_crosshairs && mode === 'region' && cursor && !dragStart && !pending) {
     ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
     ctx.fillRect(0, cursor.y, width, px);
     ctx.fillRect(cursor.x, 0, px, height);
@@ -113,7 +113,7 @@ function updateSizeLabel(r) {
 
 function drawLoupe(e) {
   const loupe = $('loupe');
-  if (!cursor || mode === 'choose' || pending || finished) { loupe.hidden = true; return; }
+  if (!info.show_magnifier || !cursor || mode === 'choose' || pending || finished) { loupe.hidden = true; return; }
   loupe.hidden = false;
 
   const dpr = window.devicePixelRatio || 1;

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::format::{ImageFormat, DEFAULT_JPEG_QUALITY};
 use crate::hotkey::{default_hotkeys, HotkeyMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -15,6 +16,16 @@ pub enum CaptureMode {
     Region,
     Window,
     FullScreen,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    /// Follow the Windows light/dark setting.
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -30,6 +41,17 @@ pub struct Settings {
     pub save_to_file: bool,
     /// Folder for saved captures; `None` = Pictures\capture-rs.
     pub save_dir: Option<PathBuf>,
+    pub image_format: ImageFormat,
+    /// JPEG quality, 1-100.
+    pub jpeg_quality: u8,
+    /// Hide the toolbox while capturing so it is not in the shot.
+    pub hide_toolbox_while_capturing: bool,
+    pub show_magnifier: bool,
+    /// Full-screen crosshair lines while aiming a region.
+    pub show_crosshairs: bool,
+    /// Start hidden in the tray when launched at Windows sign-in.
+    pub start_minimized: bool,
+    pub theme: Theme,
     pub hotkeys: HotkeyMap,
 }
 
@@ -43,6 +65,13 @@ impl Default for Settings {
             delay_secs: 0,
             save_to_file: true,
             save_dir: None,
+            image_format: ImageFormat::Png,
+            jpeg_quality: DEFAULT_JPEG_QUALITY,
+            hide_toolbox_while_capturing: true,
+            show_magnifier: true,
+            show_crosshairs: true,
+            start_minimized: true,
+            theme: Theme::System,
             hotkeys: default_hotkeys(),
         }
     }
@@ -74,6 +103,7 @@ impl Settings {
 
     pub fn sanitized(mut self) -> Self {
         self.delay_secs = self.delay_secs.min(MAX_DELAY_SECS);
+        self.jpeg_quality = self.jpeg_quality.clamp(1, 100);
         self
     }
 }
@@ -86,8 +116,12 @@ mod tests {
     #[test]
     fn missing_fields_take_defaults() {
         let s: Settings =
-            serde_json::from_str(r#"{"capture_mode":"window","delay_secs":99}"#).unwrap();
+            serde_json::from_str(r#"{"capture_mode":"window","delay_secs":99,"jpeg_quality":0}"#)
+                .unwrap();
         let s = s.sanitized();
+        assert_eq!(s.jpeg_quality, 1);
+        assert_eq!(s.image_format, ImageFormat::Png);
+        assert!(s.show_magnifier);
         assert_eq!(s.capture_mode, CaptureMode::Window);
         assert_eq!(s.delay_secs, MAX_DELAY_SECS);
         assert_eq!(
