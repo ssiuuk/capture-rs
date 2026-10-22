@@ -28,6 +28,10 @@ Planned: annotation editor (arrows, shapes, text, blur, crop), cursor capture, s
 
 On Windows 11, Print Screen opens Snipping Tool by default. Turn off **Settings > Accessibility > Keyboard > Use the Print screen key to open screen capture**, or pick other hotkeys in the Hotkeys window.
 
+## Download
+
+Each [GitHub release](https://github.com/ssiuuk/capture-rs/releases) has a setup installer and a portable .exe, built by the Release workflow when the release is published.
+
 ## Building
 
 Requirements: Windows 10 1903 or later, the Rust stable toolchain (MSVC), and the WebView2 runtime (preinstalled on Windows 11).
