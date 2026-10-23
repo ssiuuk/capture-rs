@@ -15,7 +15,7 @@ pub struct Session {
     pub snapshot: Arc<DesktopSnapshot>,
     pub mode: CaptureMode,
     pub overlay_labels: Vec<String>,
-    pub toolbox_was_visible: bool,
+    pub restore: crate::capture::Restore,
 }
 
 pub struct AppState {

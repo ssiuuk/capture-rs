@@ -21,6 +21,8 @@ pub struct CaptureOutcome {
     pub width: u32,
     pub height: u32,
     pub message: Option<String>,
+    /// The capture's id in the editor library.
+    pub id: Option<String>,
 }
 
 impl CaptureOutcome {

@@ -1,6 +1,7 @@
 //! The capture pipeline: freeze the desktop, show one overlay window per
 //! monitor, then crop and hand the result to `output`.
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,8 +9,6 @@ use std::time::Duration;
 use capture_core::desktop::{DesktopSnapshot, MonitorInfo, WindowInfo};
 use capture_core::geom::Rect;
 use capture_core::settings::CaptureMode;
-use image::codecs::png::{CompressionType, FilterType, PngEncoder};
-use image::ImageEncoder;
 use serde::Serialize;
 use tauri::http::{header, Request, Response, StatusCode};
 use tauri::{
@@ -19,7 +18,7 @@ use tauri::{
 
 use crate::commands::{notify_toolbox, CaptureOutcome, TOOLBOX};
 use crate::state::{lock, AppState, Session};
-use crate::{output, platform};
+use crate::{editor, library, output, platform};
 
 /// What the user asked to capture.
 #[derive(Debug, Clone, Copy)]
@@ -29,6 +28,14 @@ pub enum CaptureRequest {
 }
 
 static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
+
+/// Which app windows were showing when a capture began, to bring back
+/// when it ends.
+#[derive(Debug, Clone, Copy)]
+pub struct Restore {
+    toolbox: bool,
+    editor: bool,
+}
 
 /// Starts a capture on a background thread. Ignored if one is running.
 ///
@@ -40,20 +47,23 @@ pub fn start(app: &AppHandle, request: CaptureRequest) {
     if state.capturing.swap(true, Ordering::SeqCst) {
         return;
     }
-    let toolbox_was_visible = app
-        .get_webview_window(TOOLBOX)
-        .is_some_and(|w| w.is_visible().unwrap_or(false));
+    let restore = Restore {
+        toolbox: app
+            .get_webview_window(TOOLBOX)
+            .is_some_and(|w| w.is_visible().unwrap_or(false)),
+        editor: editor::is_visible(app),
+    };
     let app = app.clone();
     std::thread::spawn(move || {
-        if let Err(message) = run(&app, request, toolbox_was_visible) {
+        if let Err(message) = run(&app, request, restore) {
             close_session(&app);
-            release(&app, toolbox_was_visible);
+            release(&app, restore);
             notify_toolbox(&app, CaptureOutcome::failed(message));
         }
     });
 }
 
-fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> Result<(), String> {
+fn run(app: &AppHandle, request: CaptureRequest, restore: Restore) -> Result<(), String> {
     let state = app.state::<AppState>();
     let settings = state.settings();
 
@@ -61,7 +71,8 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
         if let Some(w) = app.get_webview_window(TOOLBOX) {
             let _ = w.hide();
         }
-        // Let the toolbox finish disappearing before grabbing the screen.
+        editor::hide(app);
+        // Let the windows finish disappearing before grabbing the screen.
         std::thread::sleep(Duration::from_millis(250));
     }
     if settings.delay_secs > 0 {
@@ -76,7 +87,7 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
             // Copy the area out first: `deliver` locks `last_area` again.
             let last = *lock(&state.last_area);
             match last {
-                Some(area) => return deliver(app, &snapshot, area, toolbox_was_visible),
+                Some(area) => return deliver(app, &snapshot, area, restore),
                 // Nothing to repeat yet: fall back to choosing a region.
                 None => CaptureMode::Region,
             }
@@ -90,7 +101,7 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
             .monitor_at(x, y)
             .map(|m| m.bounds)
             .ok_or("No monitor found")?;
-        return deliver(app, &snapshot, area, toolbox_was_visible);
+        return deliver(app, &snapshot, area, restore);
     }
 
     // Publish the session before any overlay loads, since each overlay asks
@@ -103,7 +114,7 @@ fn run(app: &AppHandle, request: CaptureRequest, toolbox_was_visible: bool) -> R
         snapshot,
         mode,
         overlay_labels: Vec::new(),
-        toolbox_was_visible,
+        restore,
     });
     for (index, monitor) in monitors.iter().enumerate() {
         let label = format!("overlay-{id}-{index}");
@@ -211,21 +222,38 @@ fn place_countdown(app: &AppHandle, window: &WebviewWindow) -> tauri::Result<()>
     window.show()
 }
 
-/// Crops, saves and copies the capture, then releases the capture. On error
-/// nothing is released; the caller does that.
+/// Crops, saves and copies the capture, adds it to the library and opens
+/// it in the editor, then releases the capture. On error nothing is
+/// released; the caller does that.
 fn deliver(
     app: &AppHandle,
     snapshot: &DesktopSnapshot,
     area: Rect,
-    show_toolbox: bool,
+    restore: Restore,
 ) -> Result<(), String> {
     let image = snapshot
         .crop(area)
         .ok_or("The selected area is outside the screen")?;
     let state = app.state::<AppState>();
     *lock(&state.last_area) = Some(area);
-    let outcome = output::deliver(app, &state.settings(), &image);
-    release(app, show_toolbox);
+    let settings = state.settings();
+    let mut outcome = output::deliver(app, &settings, &image);
+    match library::add(app, &image, outcome.path.as_ref().map(PathBuf::from)) {
+        Ok(id) => outcome.id = Some(id),
+        Err(e) => {
+            let note = format!("Could not add it to the editor's recent captures: {e}");
+            outcome.message = Some(match outcome.message.take() {
+                Some(m) => format!("{m} {note}"),
+                None => note,
+            });
+        }
+    }
+    release(app, restore);
+    if settings.open_in_editor {
+        if let Some(id) = &outcome.id {
+            editor::open(app, Some(id));
+        }
+    }
     notify_toolbox(app, outcome);
     Ok(())
 }
@@ -244,14 +272,17 @@ fn close_session(app: &AppHandle) -> Option<Session> {
     session
 }
 
-/// Ends the capture: lets a new one start and brings the toolbox back if it
-/// was showing when the capture began.
-fn release(app: &AppHandle, show_toolbox: bool) {
+/// Ends the capture: lets a new one start and brings back the windows that
+/// were showing when the capture began.
+fn release(app: &AppHandle, restore: Restore) {
     app.state::<AppState>()
         .capturing
         .store(false, Ordering::SeqCst);
-    if show_toolbox {
+    if restore.toolbox {
         crate::commands::show_toolbox(app);
+    }
+    if restore.editor {
+        editor::show(app);
     }
 }
 
@@ -319,9 +350,9 @@ pub fn overlay_ready(app: AppHandle, window: WebviewWindow) -> Result<(), String
 #[tauri::command]
 pub async fn overlay_finish(app: AppHandle, area: Rect) -> Result<(), String> {
     let session = close_session(&app).ok_or("No capture in progress")?;
-    let result = deliver(&app, &session.snapshot, area, session.toolbox_was_visible);
+    let result = deliver(&app, &session.snapshot, area, session.restore);
     if let Err(message) = &result {
-        release(&app, session.toolbox_was_visible);
+        release(&app, session.restore);
         notify_toolbox(&app, CaptureOutcome::failed(message.clone()));
     }
     result
@@ -332,7 +363,7 @@ pub fn overlay_cancel(app: AppHandle) {
     // Only the call that takes the session ends the capture, so a stray
     // cancel from a closing overlay cannot release a newer capture.
     if let Some(session) = close_session(&app) {
-        release(&app, session.toolbox_was_visible);
+        release(&app, session.restore);
         let _ = app.emit_to(TOOLBOX, "capture-cancelled", ());
     }
 }
@@ -386,14 +417,5 @@ fn encode_monitor(app: &AppHandle, path: &str) -> Result<Vec<u8>, String> {
         .ok_or("unknown monitor")?
         .bounds;
     let image = snapshot.crop(bounds).ok_or("monitor outside desktop")?;
-    let mut png = Vec::with_capacity(image.as_raw().len() / 4);
-    PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::NoFilter)
-        .write_image(
-            image.as_raw(),
-            image.width(),
-            image.height(),
-            image::ExtendedColorType::Rgba8,
-        )
-        .map_err(|e| e.to_string())?;
-    Ok(png)
+    library::encode_png_fast(&image)
 }

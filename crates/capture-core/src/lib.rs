@@ -7,5 +7,6 @@ pub mod desktop;
 pub mod format;
 pub mod geom;
 pub mod hotkey;
+pub mod library;
 pub mod naming;
 pub mod settings;

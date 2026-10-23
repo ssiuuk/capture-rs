@@ -14,8 +14,8 @@ const KEY_LABELS = {
   NumpadAdd: 'Num +', NumpadSubtract: 'Num -', NumpadMultiply: 'Num *', NumpadDivide: 'Num /',
   NumpadDecimal: 'Num .', NumpadEnter: 'Num Enter',
 };
-const DEFAULTS = { image_format: 'png', jpeg_quality: 90, theme: 'system', start_minimized: true, hide_toolbox_while_capturing: true, show_magnifier: true, show_crosshairs: true, save_to_file: true, copy_to_clipboard: true, save_dir: null };
-const CHECKS = ['start_minimized', 'hide_toolbox_while_capturing', 'show_magnifier', 'show_crosshairs', 'save_to_file', 'copy_to_clipboard'];
+const DEFAULTS = { image_format: 'png', jpeg_quality: 90, theme: 'system', start_minimized: true, hide_toolbox_while_capturing: true, show_magnifier: true, show_crosshairs: true, save_to_file: true, copy_to_clipboard: true, open_in_editor: true, save_dir: null };
+const CHECKS = ['start_minimized', 'hide_toolbox_while_capturing', 'show_magnifier', 'show_crosshairs', 'save_to_file', 'copy_to_clipboard', 'open_in_editor'];
 
 let settings = null;
 let hotkeys = null;
