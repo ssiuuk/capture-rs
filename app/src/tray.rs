@@ -3,8 +3,8 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::AppHandle;
 
-use crate::commands;
 use crate::hotkeys::run_action;
+use crate::{commands, editor};
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
@@ -17,6 +17,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &item("fullscreen", "Capture full screen")?,
             &PredefinedMenuItem::separator(app)?,
             &item("toolbox", "Show toolbox")?,
+            &item("editor", "Open editor")?,
             &item("preferences", "Preferences...")?,
             &PredefinedMenuItem::separator(app)?,
             &item("quit", "Quit capture-rs")?,
@@ -33,6 +34,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "window" => run_action(app, HotkeyAction::CaptureWindow),
             "fullscreen" => run_action(app, HotkeyAction::CaptureFullScreen),
             "toolbox" => commands::show_toolbox(app),
+            "editor" => editor::open(app, None),
             "preferences" => commands::show_preferences(app),
             "quit" => app.exit(0),
             _ => {}

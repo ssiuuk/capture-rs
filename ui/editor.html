@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>capture-rs editor</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="editor.css" />
+</head>
+<body>
+  <div class="editor">
+    <header class="bar">
+      <div class="group">
+        <button id="capture" class="capture" title="New capture">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5" class="dot"/></svg>
+          <span>Capture</span>
+        </button>
+        <button id="open" class="cmd" title="Open image files (Ctrl+O)">
+          <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>Open</span>
+        </button>
+      </div>
+
+      <nav id="tools" class="tools" aria-label="Tools"></nav>
+
+      <div class="group">
+        <button id="undo" class="cmd" title="Undo (Ctrl+Z)">
+          <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+          <span>Undo</span>
+        </button>
+        <button id="redo" class="cmd" title="Redo (Ctrl+Y)">
+          <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+          <span>Redo</span>
+        </button>
+        <span class="sep"></span>
+        <button id="copy" class="cmd" title="Copy the image (Ctrl+Shift+C)">
+          <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+          <span>Copy</span>
+        </button>
+        <div class="menu-wrap">
+          <button id="save" class="primary" title="Save (Ctrl+S)">
+            <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+            Save
+          </button>
+          <button id="save_menu" class="primary caret" aria-label="More save options" aria-haspopup="menu">
+            <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>
+          </button>
+          <div id="save_popup" class="popup right" role="menu" hidden>
+            <button data-action="save">Save<kbd>Ctrl+S</kbd></button>
+            <button data-action="save_as">Save as...<kbd>Ctrl+Shift+S</kbd></button>
+            <button data-action="copy">Copy image<kbd>Ctrl+Shift+C</kbd></button>
+            <button data-action="reveal">Show in folder</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="work">
+      <div id="viewport" class="viewport">
+        <div id="stage" class="stage"><div id="spacer"></div></div>
+        <canvas id="view"></canvas>
+        <textarea id="text_input" class="text-input" spellcheck="false" hidden></textarea>
+        <div id="empty" class="empty" hidden>
+          <p>No captures yet.</p>
+          <p>Press <b>Capture</b>, open an image, or drop image files here.</p>
+        </div>
+      </div>
+      <aside id="panel" class="panel">
+        <h2 id="panel_title">Properties</h2>
+        <div id="props" class="props"></div>
+      </aside>
+    </main>
+
+    <footer class="status-bar">
+      <button id="toggle_tray" class="flat" aria-pressed="true" title="Show or hide recent captures">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+        Recent <span id="count" class="muted"></span>
+      </button>
+      <span id="message" class="message" role="status"></span>
+      <span class="spacer"></span>
+      <div class="zoom">
+        <button id="zoom_out" class="flat icon" title="Zoom out (Ctrl+-)"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+        <div class="menu-wrap">
+          <button id="zoom_label" class="flat" aria-haspopup="menu">100%</button>
+          <div id="zoom_popup" class="popup up" role="menu" hidden>
+            <button data-zoom="fit">Fit<kbd>Ctrl+0</kbd></button>
+            <button data-zoom="0.25">25%</button>
+            <button data-zoom="0.5">50%</button>
+            <button data-zoom="1">100%<kbd>Ctrl+1</kbd></button>
+            <button data-zoom="2">200%</button>
+            <button data-zoom="4">400%</button>
+          </div>
+        </div>
+        <button id="zoom_in" class="flat icon" title="Zoom in (Ctrl+=)"><svg viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+      </div>
+      <span id="size" class="size muted"></span>
+      <button id="toggle_panel" class="flat" aria-pressed="true" title="Show or hide properties">
+        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        Properties
+      </button>
+    </footer>
+
+    <section id="tray" class="tray" aria-label="Recent captures">
+      <div id="thumbs" class="thumbs"></div>
+    </section>
+  </div>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

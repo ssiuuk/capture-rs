@@ -3,7 +3,9 @@
 
 mod capture;
 mod commands;
+mod editor;
 mod hotkeys;
+mod library;
 mod output;
 mod platform;
 mod state;
@@ -33,6 +35,7 @@ fn main() {
         )
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("snapshot", capture::serve_snapshot)
+        .register_asynchronous_uri_scheme_protocol("library", library::serve)
         .setup(|app| {
             app.manage(AppState::load(app.handle())?);
             tray::create(app.handle())?;
@@ -75,6 +78,17 @@ fn main() {
             capture::overlay_ready,
             capture::overlay_finish,
             capture::overlay_cancel,
+            editor::open_editor,
+            editor::editor_copy,
+            editor::editor_save,
+            editor::editor_save_as,
+            editor::reveal_file,
+            library::library_list,
+            library::library_get_doc,
+            library::library_save_doc,
+            library::library_save_thumb,
+            library::library_delete,
+            library::library_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running capture-rs");

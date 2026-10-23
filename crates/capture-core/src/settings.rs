@@ -33,8 +33,8 @@ pub enum Theme {
 pub struct Settings {
     pub capture_mode: CaptureMode,
     pub copy_to_clipboard: bool,
-    /// Reserved for the editor; has no effect yet.
-    pub preview_in_editor: bool,
+    /// Open the editor with the new capture selected after each capture.
+    pub open_in_editor: bool,
     pub capture_cursor: bool,
     /// Seconds to wait before grabbing the screen; 0 = no delay.
     pub delay_secs: u8,
@@ -44,7 +44,8 @@ pub struct Settings {
     pub image_format: ImageFormat,
     /// JPEG quality, 1-100.
     pub jpeg_quality: u8,
-    /// Hide the toolbox while capturing so it is not in the shot.
+    /// Hide the toolbox and editor while capturing so they are not in the
+    /// shot.
     pub hide_toolbox_while_capturing: bool,
     pub show_magnifier: bool,
     /// Full-screen crosshair lines while aiming a region.
@@ -60,7 +61,7 @@ impl Default for Settings {
         Self {
             capture_mode: CaptureMode::Ask,
             copy_to_clipboard: true,
-            preview_in_editor: false,
+            open_in_editor: true,
             capture_cursor: false,
             delay_secs: 0,
             save_to_file: true,

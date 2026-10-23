@@ -1,7 +1,8 @@
 //! Where a finished capture goes: an image file and/or the clipboard.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use capture_core::format::ImageFormat;
 use capture_core::naming::{capture_file_name, unique_path};
 use capture_core::settings::Settings;
 use image::RgbaImage;
@@ -50,22 +51,38 @@ pub fn deliver(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Captu
 }
 
 fn save_file(app: &AppHandle, settings: &Settings, image: &RgbaImage) -> Result<PathBuf, String> {
+    let path = new_file_path(app, settings)?;
+    write_image(&path, settings, image)?;
+    Ok(path)
+}
+
+/// A free path for a new capture in the capture folder, in the format
+/// chosen in Preferences. Creates the folder if needed.
+pub fn new_file_path(app: &AppHandle, settings: &Settings) -> Result<PathBuf, String> {
     let dir = capture_dir(app, settings)?;
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
-    let format = settings.image_format;
-    let bytes = format
-        .encode(image, settings.jpeg_quality)
-        .map_err(|e| format!("Could not encode the capture: {e}"))?;
+    Ok(unique_path(&dir, &new_file_name(settings), |p| p.exists()))
+}
+
+/// The time-stamped name a capture made now would get.
+pub fn new_file_name(settings: &Settings) -> String {
     let now = local_now();
-    let name = capture_file_name(
+    capture_file_name(
         (now.0, now.1, now.2),
         (now.3, now.4, now.5),
-        format.extension(),
-    );
-    let path = unique_path(&dir, &name, |p| p.exists());
-    std::fs::write(&path, bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
-    Ok(path)
+        settings.image_format.extension(),
+    )
+}
+
+/// Writes `image` to `path` in the format its extension names, or the
+/// Preferences format if the extension is not one we can write.
+pub fn write_image(path: &Path, settings: &Settings, image: &RgbaImage) -> Result<(), String> {
+    let format = ImageFormat::from_path(path).unwrap_or(settings.image_format);
+    let bytes = format
+        .encode(image, settings.jpeg_quality)
+        .map_err(|e| format!("Could not encode the image: {e}"))?;
+    std::fs::write(path, bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))
 }
 
 /// Local date and time as (year, month, day, hour, minute, second).

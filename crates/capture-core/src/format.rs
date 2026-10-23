@@ -31,6 +31,18 @@ impl ImageFormat {
         }
     }
 
+    /// The format a file name's extension asks for, ignoring case.
+    pub fn from_path(path: &std::path::Path) -> Option<Self> {
+        let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+        match ext.as_str() {
+            "png" => Some(ImageFormat::Png),
+            "jpg" | "jpeg" => Some(ImageFormat::Jpeg),
+            "bmp" => Some(ImageFormat::Bmp),
+            "tif" | "tiff" => Some(ImageFormat::Tiff),
+            _ => None,
+        }
+    }
+
     /// Encodes `image` in this format. JPEG has no transparency, so its
     /// alpha channel is dropped; `jpeg_quality` (1-100) only affects JPEG.
     pub fn encode(self, image: &RgbaImage, jpeg_quality: u8) -> Result<Vec<u8>, String> {
@@ -87,6 +99,30 @@ mod tests {
             let bytes = format.encode(&img, DEFAULT_JPEG_QUALITY).unwrap();
             let decoded = image::load_from_memory(&bytes).unwrap();
             assert_eq!((decoded.width(), decoded.height()), (7, 5), "{format:?}");
+        }
+    }
+
+    #[test]
+    fn formats_come_from_extensions() {
+        use std::path::Path;
+        assert_eq!(
+            ImageFormat::from_path(Path::new("a/b.JPEG")),
+            Some(ImageFormat::Jpeg)
+        );
+        assert_eq!(
+            ImageFormat::from_path(Path::new("b.tif")),
+            Some(ImageFormat::Tiff)
+        );
+        assert_eq!(ImageFormat::from_path(Path::new("b.gif")), None);
+        assert_eq!(ImageFormat::from_path(Path::new("png")), None);
+        for f in [
+            ImageFormat::Png,
+            ImageFormat::Jpeg,
+            ImageFormat::Bmp,
+            ImageFormat::Tiff,
+        ] {
+            let name = format!("x.{}", f.extension());
+            assert_eq!(ImageFormat::from_path(Path::new(&name)), Some(f));
         }
     }
 
