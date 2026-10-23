@@ -21,6 +21,11 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy -p capture-core --all-targets -- -D warnings
       - run: cargo test -p capture-core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Editor script tests
+        run: node --test ui/tests/*.test.mjs
 
   windows:
     name: Windows build

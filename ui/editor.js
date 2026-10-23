@@ -5,6 +5,7 @@
 // changed. Copy and Save render the finished image and hand it to the app.
 
 import * as D from './editor-draw.js';
+import { SaveQueue } from './editor-save.js';
 
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -195,8 +196,9 @@ function image(src) {
   return img.complete && img.naturalWidth ? img : null;
 }
 
-// Draws the capture and its objects for image area `r` into `canvas`.
-function renderInto(canvas, r, editing = null) {
+// Draws a capture and its objects for image area `r` into `canvas`; by
+// default the capture being edited.
+function renderInto(canvas, r, editing = null, src = { img: current.img, objects: doc.objects }) {
   const w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
@@ -206,9 +208,9 @@ function renderInto(canvas, r, editing = null) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
   ctx.setTransform(1, 0, 0, 1, -r.x, -r.y);
-  ctx.drawImage(current.img, 0, 0);
+  ctx.drawImage(src.img, 0, 0);
   const env = { ox: r.x, oy: r.y, scratch, scratch2, image, editing };
-  for (const o of doc.objects) D.drawObject(ctx, o, env);
+  for (const o of src.objects) D.drawObject(ctx, o, env);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
@@ -1428,7 +1430,7 @@ function renderTray() {
     const when = new Date(e.created_ms).toLocaleString();
     const del = h('button', { class: 'del', title: 'Remove from recent captures', html: svg('close') });
     const item = h('div', {
-      class: 'thumb', role: 'button', tabindex: 0, 'aria-current': String(current?.id === e.id),
+      class: 'thumb', role: 'button', tabindex: 0, 'data-id': e.id, 'aria-current': String(current?.id === e.id),
       title: `${e.width} × ${e.height} px, ${when}${e.saved_path ? `\n${e.saved_path}` : ''}`,
       onclick: (ev) => { if (!ev.target.closest('.del')) open(e.id); },
       onkeydown: (ev) => { if (ev.key === 'Enter') open(e.id); },
@@ -1441,7 +1443,7 @@ function renderTray() {
         setTimeout(() => del.isConnected && renderTray(), 3000);
         return;
       }
-      if (current?.id === e.id) saveCancelled = true;
+      saves.drop(e.id);
       try {
         await invoke('library_delete', { id: e.id });
       } catch (err) {
@@ -1502,13 +1504,10 @@ async function open(id) {
 }
 
 function afterOpen() {
-  images.clear();
-  alphaCache.clear();
   selectedId = null;
   hoverId = null;
   region = null;
   nextStep = null;
-  saveCancelled = false;
   if (tool === 'crop') cropDraft = current ? (doc.crop ? { ...doc.crop } : full()) : null;
   fit = true;
   stage.scrollLeft = stage.scrollTop = 0;
@@ -1532,40 +1531,40 @@ async function importImages(paths) {
 
 // ---- Autosave -------------------------------------------------------------
 
-let saveTimer = 0;
-let pendingSave = null; // id of a capture with unsaved changes
-let saveCancelled = false;
+// Each change queues a snapshot of the capture it was made to, so it is
+// saved to that capture even if the editor has moved on to another.
+const saves = new SaveQueue(writeSnapshot);
 
 function scheduleSave() {
   if (!current) return;
-  pendingSave = current.id;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushSave, 600);
+  const { id, img, W, H } = current;
+  saves.schedule({ id, img, W, H, crop: doc.crop, objects: doc.objects });
 }
 
-async function flushSave() {
-  clearTimeout(saveTimer);
-  const id = pendingSave;
-  pendingSave = null;
-  if (!id || !current || current.id !== id || saveCancelled) return;
-  const data = { version: 1, crop: doc.crop, objects: doc.objects };
+function flushSave() {
+  return saves.flush();
+}
+
+async function writeSnapshot(s) {
   try {
-    await invoke('library_save_doc', { id, doc: data });
-    const r = doc.crop || full();
+    await invoke('library_save_doc', { id: s.id, doc: { version: 1, crop: s.crop, objects: s.objects } });
+    const r = s.crop || { x: 0, y: 0, w: s.W, h: s.H };
     const scale = Math.min(1, 320 / Math.max(r.w, r.h));
     const thumb = document.createElement('canvas');
     thumb.width = Math.max(1, Math.round(r.w * scale));
     thumb.height = Math.max(1, Math.round(r.h * scale));
+    const whole = document.createElement('canvas');
+    renderInto(whole, r, null, s);
     const ctx = thumb.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(renderArea(r), 0, 0, thumb.width, thumb.height);
-    await invoke('library_save_thumb', await pngBytes(thumb), { headers: { 'x-capture-id': id } });
-    thumbVersion.set(id, (thumbVersion.get(id) || 0) + 1);
-    const img = [...document.querySelectorAll('.thumb[aria-current="true"] img')][0];
-    if (img && current?.id === id) img.src = thumbUrl(id);
+    ctx.drawImage(whole, 0, 0, thumb.width, thumb.height);
+    await invoke('library_save_thumb', await pngBytes(thumb), { headers: { 'x-capture-id': s.id } });
+    thumbVersion.set(s.id, (thumbVersion.get(s.id) || 0) + 1);
+    const img = document.querySelector(`.thumb[data-id="${s.id}"] img`);
+    if (img) img.src = thumbUrl(s.id);
   } catch (e) {
     // The capture may have been removed meanwhile; only report real failures.
-    if (entries.some((x) => x.id === id)) setMessage(`Could not save your changes: ${e}`, true);
+    if (entries.some((x) => x.id === s.id)) setMessage(`Could not save your changes: ${e}`, true);
   }
 }
 

@@ -2,6 +2,8 @@
 // is in image pixels. Objects are plain data and are never changed in
 // place: edits make a new object, so undo snapshots can share them.
 
+import { wrapLines } from './text-wrap.js';
+
 export const STAMPS = ['check', 'cross', 'warning', 'info', 'question', 'star', 'heart', 'no'];
 export const FONTS = ['Segoe UI', 'Arial', 'Georgia', 'Consolas', 'Comic Sans MS'];
 
@@ -35,32 +37,10 @@ export function fontOf(o, size = o.size) {
 export const lineHeight = (o) => Math.round(o.size * 1.25);
 export const textPad = (o) => Math.round(o.size * 0.3);
 
-// Splits text into lines that fit `maxWidth`, breaking at spaces and, for
-// words longer than a line, between characters.
+// Splits text into lines that fit `maxWidth` in `font`.
 export function wrap(text, font, maxWidth) {
   measureCtx.font = font;
-  const width = (s) => measureCtx.measureText(s).width;
-  const lines = [];
-  for (const para of String(text).split('\n')) {
-    let line = '';
-    for (const word of para.split(/(\s+)/)) {
-      const next = line + word;
-      if (!line || width(next) <= maxWidth) {
-        line = next;
-        continue;
-      }
-      lines.push(line.trimEnd());
-      line = word.trimStart();
-      while (line && width(line) > maxWidth) {
-        let cut = line.length - 1;
-        while (cut > 1 && width(line.slice(0, cut)) > maxWidth) cut--;
-        lines.push(line.slice(0, cut));
-        line = line.slice(cut);
-      }
-    }
-    lines.push(line.trimEnd());
-  }
-  return lines;
+  return wrapLines(text, maxWidth, (s) => measureCtx.measureText(s).width);
 }
 
 export function textHeight(o) {

@@ -75,6 +75,8 @@ Recent captures live in `%LOCALAPPDATA%\io.github.ssiuuk.capture-rs\library`: `<
 | Ctrl+wheel, Space+drag | Zoom, pan |
 | Shift while drawing | Straight lines at 45° steps, squares and circles |
 
+`node --test ui/tests/*.test.mjs` (Node 22) runs the tests for the editor's text wrapping and autosave queue.
+
 On Linux or macOS, `cargo test -p capture-core` runs the core tests, and `cargo check -p capture-rs --target x86_64-pc-windows-gnu` type-checks the Windows app.
 
 ## License
