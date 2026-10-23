@@ -2,6 +2,7 @@
 //! to read and update it. File layout is described in
 //! [`capture_core::library`].
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use capture_core::library::{self, Entry, Part};
@@ -126,7 +127,7 @@ pub async fn library_save_thumb(
     let id = header(&request, "x-capture-id")?;
     let bytes = png_bytes(&request)?;
     entry(&app, id)?;
-    library::write_atomic(&part(&app, id, Part::Thumb)?, bytes)
+    library::write_atomic(&part(&app, id, Part::Thumb)?, &bytes)
 }
 
 #[tauri::command]
@@ -186,16 +187,29 @@ pub fn header<'a>(request: &'a tauri::ipc::Request<'_>, name: &str) -> Result<&'
         .ok_or_else(|| format!("missing {name}"))
 }
 
-/// The PNG the editor sent as a raw request body.
-pub fn png_bytes<'a>(request: &'a tauri::ipc::Request<'_>) -> Result<&'a [u8], String> {
-    match request.body() {
-        InvokeBody::Raw(bytes) if bytes.starts_with(b"\x89PNG") => Ok(bytes),
-        _ => Err("expected PNG image data".into()),
+/// The PNG the editor sent as the request body. It normally arrives raw,
+/// but if the webview falls back to its postMessage channel the bytes come
+/// as a JSON array of numbers instead.
+pub fn png_bytes<'a>(request: &'a tauri::ipc::Request<'_>) -> Result<Cow<'a, [u8]>, String> {
+    body_bytes(request.body())
+        .filter(|b| b.starts_with(b"\x89PNG"))
+        .ok_or_else(|| "The editor did not send PNG image data.".into())
+}
+
+fn body_bytes(body: &InvokeBody) -> Option<Cow<'_, [u8]>> {
+    match body {
+        InvokeBody::Raw(bytes) => Some(Cow::Borrowed(bytes)),
+        InvokeBody::Json(serde_json::Value::Array(items)) => items
+            .iter()
+            .map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
+            .collect::<Option<Vec<u8>>>()
+            .map(Cow::Owned),
+        InvokeBody::Json(_) => None,
     }
 }
 
 pub fn decode_png(request: &tauri::ipc::Request<'_>) -> Result<RgbaImage, String> {
-    image::load_from_memory_with_format(png_bytes(request)?, image::ImageFormat::Png)
+    image::load_from_memory_with_format(&png_bytes(request)?, image::ImageFormat::Png)
         .map(|i| i.to_rgba8())
         .map_err(|e| format!("Could not read the edited image: {e}"))
 }
@@ -226,4 +240,22 @@ pub fn serve(
         };
         responder.respond(response.expect("static response parts are valid"));
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn body_bytes_accepts_raw_and_json_arrays() {
+        let png = vec![0x89, b'P', b'N', b'G', 0, 255];
+        assert_eq!(
+            body_bytes(&InvokeBody::Raw(png.clone())).as_deref(),
+            Some(&png[..])
+        );
+        let json = InvokeBody::Json(serde_json::json!([0x89, 80, 78, 71, 0, 255]));
+        assert_eq!(body_bytes(&json).as_deref(), Some(&png[..]));
+        assert!(body_bytes(&InvokeBody::Json(serde_json::json!([256]))).is_none());
+        assert!(body_bytes(&InvokeBody::Json(serde_json::json!({"0": 1}))).is_none());
+    }
 }
