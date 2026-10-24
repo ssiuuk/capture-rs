@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath artifact configuration for capture-rs. The Release workflow
+     submits one .exe per signing request (the app, then the installer) and
+     passes the version from app/tauri.conf.json. Paste this into the
+     SignPath project as its default artifact configuration. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <pe-file product-name="capture-rs" product-version="${version}">
+    <authenticode-sign />
+  </pe-file>
+</artifact-configuration>

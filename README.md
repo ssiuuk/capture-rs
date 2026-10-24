@@ -33,7 +33,7 @@ On Windows 11, Print Screen opens Snipping Tool by default. Turn off **Settings 
 
 ## Download
 
-Each [GitHub release](https://github.com/ssiuuk/capture-rs/releases) has a setup installer and a portable .exe, built by the Release workflow when the release is published.
+Each [GitHub release](https://github.com/ssiuuk/capture-rs/releases) has a setup installer and a portable .exe, built by the Release workflow when the release is published. See the [code signing policy](#code-signing-policy).
 
 ## Building
 
@@ -78,6 +78,19 @@ Recent captures live in `%LOCALAPPDATA%\io.github.ssiuuk.capture-rs\library`: `<
 `node --test ui/tests/*.test.mjs` (Node 22) runs the tests for the editor's text wrapping and autosave queue.
 
 On Linux or macOS, `cargo test -p capture-core` runs the core tests, and `cargo check -p capture-rs --target x86_64-pc-windows-gnu` type-checks the Windows app.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Only the setup installer and portable .exe that the Release workflow builds from this repository's source are signed, and each release is approved by hand before it is signed.
+
+Team roles:
+
+- Committers and reviewers: [ssiuuk](https://github.com/ssiuuk)
+- Approvers: [ssiuuk](https://github.com/ssiuuk)
+
+Privacy policy: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
 
 ## License
 
