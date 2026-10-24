@@ -62,6 +62,7 @@ fn main() {
             commands::get_settings,
             commands::update_settings,
             commands::start_capture,
+            commands::open_toolbox,
             commands::open_preferences,
             commands::pick_save_folder,
             commands::get_capture_folder,
