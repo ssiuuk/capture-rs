@@ -1392,7 +1392,7 @@ for (const b of $('save_popup').querySelectorAll('button')) {
 }
 $('undo').addEventListener('click', undo);
 $('redo').addEventListener('click', redo);
-$('capture').addEventListener('click', () => invoke('start_capture', { mode: null }));
+$('capture').addEventListener('click', () => invoke('open_toolbox'));
 $('open').addEventListener('click', () => importImages(null));
 
 // ---- Library and tray -----------------------------------------------------

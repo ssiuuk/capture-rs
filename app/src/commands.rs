@@ -167,6 +167,13 @@ pub async fn start_capture(app: AppHandle, mode: Option<CaptureMode>) {
     capture::start(&app, CaptureRequest::Mode(mode));
 }
 
+/// Brings up the capture toolbox, so the user can pick the mode and
+/// options before capturing.
+#[tauri::command]
+pub async fn open_toolbox(app: AppHandle) {
+    show_toolbox(&app);
+}
+
 #[tauri::command]
 pub async fn open_preferences(app: AppHandle) {
     show_preferences(&app);
